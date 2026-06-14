@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SC 過去問道場</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#4338ca">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+<div id="app-root">
+<style>
+  :root{
+    --paper:#f6f5f1; --card:#ffffff; --ink:#1d1c24; --muted:#6c6979;
+    --line:#e6e3da; --primary:#4338ca; --primary-soft:#eceaff;
+    --ok:#1f9d6b; --ok-soft:#e4f5ec; --ng:#d64545; --ng-soft:#fbe9e9;
+    --due:#c98414; --due-soft:#fbf0db; --new:#3b82c4; --new-soft:#e6f0fa;
+    --unk:#7a5af5; --unk-soft:#efeaff;
+    --radius:14px; --shadow:0 1px 2px rgba(20,18,30,.05),0 6px 24px rgba(20,18,30,.06);
+    --jp:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic","Meiryo","Noto Sans JP",system-ui,sans-serif;
+  }
+  #app-root{font-family:var(--jp); color:var(--ink); background:var(--paper); -webkit-font-smoothing:antialiased; line-height:1.6; min-height:100vh;}
+  #app-root *{box-sizing:border-box;}
+  .wrap{max-width:760px; margin:0 auto; padding:18px 16px 90px;}
+  .topbar{display:flex; align-items:center; gap:12px; padding:6px 2px 14px;}
+  .logo{font-weight:800; font-size:19px; letter-spacing:.02em;}
+  .logo .dot{color:var(--primary);}
+  .persist-note{margin-left:auto; font-size:11.5px; color:var(--muted); background:#fff; border:1px solid var(--line); padding:4px 9px; border-radius:999px;}
+  .persist-note.warn{color:var(--due); border-color:var(--due-soft); background:var(--due-soft);}
+  .tabs{display:flex; gap:6px; background:#efede7; padding:5px; border-radius:12px; margin-bottom:18px;}
+  .tab{flex:1; text-align:center; padding:9px 4px; border-radius:8px; font-size:13.5px; font-weight:600; color:var(--muted); cursor:pointer; border:none; background:transparent; font-family:inherit; transition:.15s;}
+  .tab[aria-selected="true"]{background:#fff; color:var(--ink); box-shadow:var(--shadow);}
+  .view{display:none;} .view.active{display:block;}
+  .grid{display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-bottom:16px;}
+  .stat{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:15px 16px;}
+  .stat .num{font-size:30px; font-weight:800; line-height:1.1; font-variant-numeric:tabular-nums;}
+  .stat .lab{font-size:12.5px; color:var(--muted); margin-top:3px;}
+  .stat.new .num{color:var(--new);} .stat.ng .num{color:var(--ng);}
+  .stat.due .num{color:var(--due);} .stat.ok .num{color:var(--ok);}
+  .panel{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:16px; margin-bottom:14px;}
+  .panel h3{margin:0 0 12px; font-size:14px; letter-spacing:.02em;}
+  .panel h3 small{font-weight:500; color:var(--muted); font-size:11.5px; margin-left:6px;}
+  .secrow{display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid var(--line);}
+  .secrow:first-of-type{border-top:none;}
+  .secname{font-weight:700; min-width:84px; flex:none; font-size:13px;}
+  .bar{flex:1; height:9px; background:#eeece6; border-radius:99px; overflow:hidden;}
+  .bar>i{display:block; height:100%; background:var(--ok); border-radius:99px;}
+  .barval{width:104px; flex:none; text-align:right; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums;}
+  .startgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:10px; margin-top:4px;}
+  .startbtn{background:var(--primary); color:#fff; border:none; border-radius:12px; padding:13px 8px; font-family:inherit; font-weight:700; font-size:14px; cursor:pointer; transition:.15s; box-shadow:var(--shadow); text-align:center;}
+  .startbtn:hover{filter:brightness(1.06);}
+  .startbtn small{display:block; font-weight:500; font-size:10.5px; opacity:.85; margin-top:3px;}
+  .startbtn.ghost{background:#fff; color:var(--primary); border:1.5px solid var(--primary-soft);}
+  .startbtn.wide{grid-column:1/-1; font-size:15px; padding:15px;}
+  .startbtn:disabled{opacity:.45; cursor:not-allowed;}
+  .checkrow{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin-top:12px;}
+  .checkrow input{width:16px; height:16px; accent-color:var(--primary);}
+  .qhead{display:flex; align-items:center; gap:10px; margin-bottom:12px; font-size:12.5px; color:var(--muted); flex-wrap:wrap;}
+  .qprog{flex:1; min-width:120px; height:6px; background:#eeece6; border-radius:99px; overflow:hidden;}
+  .qprog>i{display:block; height:100%; background:var(--primary); transition:width .3s;}
+  .badge{display:inline-block; font-size:11px; font-weight:700; padding:3px 9px; border-radius:99px;}
+  .badge.cat{background:var(--primary-soft); color:var(--primary);}
+  .badge.yr{background:#efece6; color:var(--muted);}
+  .qcard{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:18px; box-shadow:var(--shadow);}
+  .qmeta{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;}
+  .qtext{font-size:15.5px; white-space:pre-wrap; margin-bottom:14px;}
+  .qimg{width:100%; border:1px solid var(--line); border-radius:10px; margin-bottom:14px; background:#fff;}
+  .choices{display:flex; flex-direction:column; gap:9px;}
+  .choice{display:flex; align-items:flex-start; gap:11px; text-align:left; background:#fff; border:1.5px solid var(--line); border-radius:11px; padding:12px 13px; font-family:inherit; font-size:14.5px; cursor:pointer; transition:.12s; width:100%; color:var(--ink);}
+  .choice:hover{border-color:var(--primary-soft); background:#fcfcff;}
+  .choice .k{flex:none; width:25px; height:25px; border-radius:7px; background:#efede7; color:var(--muted); font-weight:800; font-size:13px; display:flex; align-items:center; justify-content:center;}
+  .choice.correct{border-color:var(--ok); background:var(--ok-soft);} .choice.correct .k{background:var(--ok); color:#fff;}
+  .choice.wrong{border-color:var(--ng); background:var(--ng-soft);} .choice.wrong .k{background:var(--ng); color:#fff;}
+  .choice:disabled{cursor:default;}
+  .dunno{margin-top:11px; width:100%; background:#fff; border:1.5px dashed var(--unk); color:var(--unk); border-radius:11px; padding:11px; font-family:inherit; font-weight:700; font-size:14px; cursor:pointer;}
+  .dunno:hover{background:var(--unk-soft);}
+  .feedback{margin-top:14px; border-radius:12px; padding:14px; font-size:14px;}
+  .feedback.ok{background:var(--ok-soft); border:1px solid #bfe6d2;}
+  .feedback.ng{background:var(--ng-soft); border:1px solid #f1cccc;}
+  .feedback .ftitle{font-weight:800; margin-bottom:6px; display:flex; align-items:center; gap:8px;}
+  .feedback.ok .ftitle{color:var(--ok);} .feedback.ng .ftitle{color:var(--ng);}
+  .feedback .exp{white-space:pre-wrap; color:#2c2b33;}
+  .nextbtn{margin-top:14px; width:100%; background:var(--primary); color:#fff; border:none; border-radius:12px; padding:14px; font-family:inherit; font-weight:700; font-size:15px; cursor:pointer;}
+  .empty{text-align:center; color:var(--muted); padding:40px 16px;}
+  .empty .big{font-size:34px; margin-bottom:8px;}
+  .btn{background:var(--primary); color:#fff; border:none; border-radius:10px; padding:11px 16px; font-family:inherit; font-weight:700; font-size:14px; cursor:pointer;}
+  .btn.sec{background:#fff; color:var(--ink); border:1.5px solid var(--line);}
+  .btn.danger{background:var(--ng);}
+  .btn.sm{padding:7px 12px; font-size:12.5px;}
+  textarea,input,select{font-family:inherit; font-size:14px; width:100%; border:1.5px solid var(--line); border-radius:10px; padding:10px 12px; background:#fff; color:var(--ink);}
+  textarea{min-height:120px; resize:vertical;}
+  label.fld{display:block; font-size:12.5px; font-weight:700; color:var(--muted); margin:12px 0 5px;}
+  .msg{font-size:13px; padding:10px 12px; border-radius:10px; margin-top:10px; display:none;}
+  .msg.show{display:block;}
+  .msg.good{background:var(--ok-soft); color:#16704d;}
+  .msg.bad{background:var(--ng-soft); color:#9a2b2b;}
+  .loglist{display:flex; flex-direction:column;}
+  .logitem{display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid var(--line); font-size:13px;}
+  .logitem:first-child{border-top:none;}
+  .logdot{flex:none; width:9px; height:9px; border-radius:99px;}
+  .logdot.ok{background:var(--ok);} .logdot.ng{background:var(--ng);} .logdot.unk{background:var(--unk);}
+  .logmain{flex:1; min-width:0;}
+  .logmain .l1{font-weight:600;}
+  .logmain .l2{font-size:11.5px; color:var(--muted);}
+  .logres{flex:none; font-size:11.5px; font-weight:700; padding:2px 8px; border-radius:99px;}
+  .logres.ok{background:var(--ok-soft); color:var(--ok);} .logres.ng{background:var(--ng-soft); color:var(--ng);} .logres.unk{background:var(--unk-soft); color:var(--unk);}
+  .seg{display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap;}
+  .seg button{border:1.5px solid var(--line); background:#fff; color:var(--muted); border-radius:99px; padding:6px 13px; font-family:inherit; font-size:12.5px; font-weight:600; cursor:pointer;}
+  .seg button[aria-pressed="true"]{background:var(--primary); color:#fff; border-color:var(--primary);}
+  .mini{font-size:11.5px; color:var(--muted);}
+  .qlist .qrow{padding:11px 0; border-top:1px solid var(--line);}
+  .qlist .qrow:first-child{border-top:none;}
+  .qrow .qr-top{display:flex; gap:7px; align-items:center; flex-wrap:wrap; margin-bottom:3px;}
+  .qrow .qr-q{font-size:13px; color:#3a3942;}
+  .linkbtn{background:none; border:none; color:var(--primary); font-family:inherit; font-size:12.5px; font-weight:700; cursor:pointer; padding:0;}
+  /* ---- mobile tuning ---- */
+  html{ -webkit-text-size-adjust:100%; }
+  textarea,input,select{ font-size:16px; }
+  .wrap{ padding-left:max(16px,env(safe-area-inset-left)); padding-right:max(16px,env(safe-area-inset-right)); padding-bottom:max(90px,env(safe-area-inset-bottom)); }
+  button{ -webkit-tap-highlight-color:transparent; }
+  .tab{ min-height:40px; }
+  .choice{ min-height:48px; }
+  @media (max-width:420px){
+    .grid{ grid-template-columns:repeat(2,1fr); gap:10px; }
+    .stat .num{ font-size:26px; }
+    .qtext{ font-size:16px; }
+    .startgrid{ grid-template-columns:repeat(auto-fill,minmax(84px,1fr)); }
+  }
+</style>
+
+<div class="wrap">
+  <div class="topbar">
+    <div class="logo">SC 過去問<span class="dot">道場</span></div>
+    <div id="persistNote" class="persist-note">…</div>
+    <div id="syncNote" class="persist-note">☁ 同期OFF</div>
+  </div>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-view="home" aria-selected="true">ホーム</button>
+    <button class="tab" role="tab" data-view="study" aria-selected="false">学習</button>
+    <button class="tab" role="tab" data-view="hist" aria-selected="false">履歴</button>
+    <button class="tab" role="tab" data-view="manage" aria-selected="false">問題管理</button>
+  </div>
+
+  <div id="view-home" class="view active"></div>
+  <div id="view-study" class="view"></div>
+  <div id="view-hist" class="view"></div>
+  <div id="view-manage" class="view"></div>
+</div>
+</div>
+
+<script>
+(function(){
+  // ===== Google 同期 設定 =====
+  // ↓↓↓ ここに自分の OAuth クライアントID を貼り付ける ↓↓↓
+  const GOOGLE_CLIENT_ID = "ここにクライアントIDを貼り付け.apps.googleusercontent.com";
+  // 例: 1234567890-abcdef.apps.googleusercontent.com
+  const DRIVE_SCOPE    = "https://www.googleapis.com/auth/drive.appdata";
+  const SYNC_FILENAME  = "kakomon-sync.json";
+  const SCHEMA_VERSION = 1;
+  const root = document.getElementById('app-root');
+  const $ = s => root.querySelector(s);
+  const el = (t,c,h)=>{const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e;};
+  const DAY = 86400000;
+  const INTERVALS = [0,1,7,30,90];           // days by SRS level
+  const KMAP = {'ア':0,'イ':1,'ウ':2,'エ':3,'1':0,'2':1,'3':2,'4':3};
+  const LETTERS = ['ア','イ','ウ','エ'];
+
+  // ---------- storage (localStorage, with window.storage / memory fallback) ----------
+  const MEM = {};
+  let lsOK = false;
+  try{ localStorage.setItem('__kakomon_test__','1'); localStorage.removeItem('__kakomon_test__'); lsOK = true; }catch(e){}
+  const persistent = !!(window.storage && window.storage.get) || lsOK;
+  async function jget(k, def){
+    if(window.storage){ try{ const r=await window.storage.get(k); if(r&&r.value!=null) return JSON.parse(r.value);}catch(e){} }
+    if(lsOK){ try{ const s=localStorage.getItem(k); if(s!=null) return JSON.parse(s); }catch(e){} }
+    if(k in MEM) return JSON.parse(MEM[k]);
+    return def;
+  }
+  async function jset(k, v){
+    const s = JSON.stringify(v); MEM[k]=s;
+    if(window.storage){ try{ await window.storage.set(k,s); return; }catch(e){} }
+    if(lsOK){ try{ localStorage.setItem(k,s); return; }catch(e){} }
+  }
+  async function jdel(k){
+    delete MEM[k];
+    if(window.storage){ try{ await window.storage.delete(k);}catch(e){} }
+    if(lsOK){ try{ localStorage.removeItem(k); }catch(e){} }
+  }
+
+  // ---------- state ----------
+  let questions = [];        // {id,section,year,exam,category,question,choices[4],answer,explanation,hasImage}
+  let progress = {};         // id -> {attempts:[{t,ok,unknown}], level, due}
+  const imgCache = {};       // id -> dataURL
+  let session = null;        // {ids:[], idx, total, doneIds:Set, filterLabel}
+  const bundledIds = new Set(); // data/ から読み込んだ標準問題のID（同期対象外の判定に使う）
+
+  async function loadImage(id){
+    if(id in imgCache) return imgCache[id];
+    const v = await jget('kakomon:img:'+id, null);
+    imgCache[id]=v; return v;
+  }
+
+  // ---------- SRS ----------
+  function record(id, ok, unknown){
+    const now=Date.now();
+    let p=progress[id]; if(!p){p={attempts:[],level:0,due:0};progress[id]=p;}
+    p.attempts.push({t:now, ok:!!ok, unknown:!!unknown});
+    if(ok){ p.level=Math.min(p.level+1, INTERVALS.length-1); p.due=now+INTERVALS[p.level]*DAY; }
+    else { p.level=0; p.due=now+1*DAY; }
+    jset('kakomon:progress', progress);
+    if(typeof schedulePush==='function') schedulePush();
+  }
+  function acc(p){ if(!p||!p.attempts.length) return null; const c=p.attempts.filter(a=>a.ok).length; return c/p.attempts.length; }
+  function groupOf(q){
+    const p=progress[q.id]; const now=Date.now();
+    if(!p||!p.attempts.length) return 0;            // 未回答
+    if(p.due<=now){ return p.attempts[p.attempts.length-1].ok ? 2 : 1; } // due復習 / due前回不正解
+    return 3;                                        // 未来(期限前)
+  }
+  function matchFilter(q,f){
+    if(!f) return true;
+    if(f.section && q.section!==f.section) return false;
+    if(f.year && q.year!==f.year) return false;
+    if(f.category && q.category!==f.category) return false;
+    return true;
+  }
+  function buildQueue(filter, includeAll){
+    const list=questions.filter(q=>matchFilter(q,filter));
+    const ranked=list.map(q=>{
+      const p=progress[q.id]; const g=groupOf(q);
+      return {q, g, n:(p?p.attempts.length:0), a:(acc(p)==null?-1:acc(p)), r:Math.random()};
+    });
+    const pool = includeAll ? ranked : ranked.filter(r=>r.g<=2);
+    // 弱点優先（g→出題回数→正答率）は維持し、同条件は乱数で毎回シャッフル
+    pool.sort((x,y)=> x.g-y.g || x.n-y.n || x.a-y.a || (x.r-y.r) );
+    return pool.map(r=>r.q.id);
+  }
+
+  // ---------- views switching ----------
+  function show(view){
+    root.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-selected', t.dataset.view===view));
+    root.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    $('#view-'+view).classList.add('active');
+    if(view==='home') renderHome();
+    if(view==='study') renderStudy();
+    if(view==='hist') renderHist();
+    if(view==='manage') renderManage();
+    window.scrollTo(0,0);
+  }
+  root.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>show(t.dataset.view)));
+
+  // ---------- HOME ----------
+  function renderHome(){
+    const v=$('#view-home'); v.innerHTML='';
+    const now=Date.now();
+    let nNew=0,nDueWrong=0,nDueRev=0,answered=0,correct=0;
+    questions.forEach(q=>{const g=groupOf(q); if(g===0)nNew++; else if(g===1)nDueWrong++; else if(g===2)nDueRev++;});
+    Object.values(progress).forEach(p=>p.attempts.forEach(a=>{answered++; if(a.ok)correct++;}));
+
+    if(!questions.length){
+      v.appendChild(el('div','empty','<div class="big">📚</div><div>まだ問題がありません。<br>「問題管理」タブから JSON を取り込んでください。</div>'));
+      return;
+    }
+    const grid=el('div','grid');
+    grid.appendChild(el('div','stat new','<div class="num">'+nNew+'</div><div class="lab">未回答</div>'));
+    grid.appendChild(el('div','stat ng','<div class="num">'+nDueWrong+'</div><div class="lab">前回不正解（復習）</div>'));
+    grid.appendChild(el('div','stat due','<div class="num">'+nDueRev+'</div><div class="lab">復習期限到来</div>'));
+    grid.appendChild(el('div','stat ok','<div class="num">'+(answered?Math.round(correct/answered*100):0)+'%</div><div class="lab">通算正答率（'+correct+'/'+answered+'）</div>'));
+    v.appendChild(grid);
+
+    // start session
+    const p=el('div','panel'); p.appendChild(el('h3',null,'今すぐ学習を始める'));
+    const dueTotal=nNew+nDueWrong+nDueRev;
+    const rec=el('button','startbtn wide','おすすめ（弱点順）<small>'+ (dueTotal? '未回答＋復習 '+dueTotal+'問' : '今日の復習はありません・全問から出題') +'</small>');
+    rec.addEventListener('click',()=>startSession(null, dueTotal===0));
+    p.appendChild(rec);
+    v.appendChild(p);
+
+    // by year
+    const years=[...new Set(questions.map(q=>q.year))].filter(Boolean);
+    if(years.length){
+      const yp=el('div','panel'); yp.appendChild(el('h3',null,'年度別に学習','<small>全問を弱点順で</small>'));
+      const g=el('div','startgrid');
+      years.forEach(y=>{
+        const cnt=questions.filter(q=>q.year===y).length;
+        const b=el('button','startbtn ghost', y+'<small>'+cnt+'問</small>');
+        b.addEventListener('click',()=>startSession({year:y}, true, y));
+        g.appendChild(b);
+      });
+      yp.appendChild(g); v.appendChild(yp);
+    }
+    // by category
+    const cats=[...new Set(questions.map(q=>q.category))].filter(Boolean);
+    if(cats.length){
+      const cp=el('div','panel'); cp.appendChild(el('h3',null,'分類別に学習','<small>全問を弱点順で</small>'));
+      const g=el('div','startgrid');
+      cats.forEach(c=>{
+        const cnt=questions.filter(q=>q.category===c).length;
+        const b=el('button','startbtn ghost', c+'<small>'+cnt+'問</small>');
+        b.addEventListener('click',()=>startSession({category:c}, true, c));
+        g.appendChild(b);
+      });
+      cp.appendChild(g); v.appendChild(cp);
+    }
+  }
+
+  // ---------- SESSION / STUDY ----------
+  function startSession(filter, includeAll, label){
+    const ids=buildQueue(filter, includeAll);
+    if(!ids.length){
+      session=null; show('study');
+      $('#view-study').innerHTML='';
+      $('#view-study').appendChild(el('div','empty','<div class="big">🎉</div><div>対象の問題がありません。<br>復習期限が来たらここに表示されます。</div>'));
+      return;
+    }
+    session={ids:ids.slice(), idx:0, total:ids.length, done:new Set(), label:label||'おすすめ'};
+    show('study');
+  }
+  function renderStudy(){
+    const v=$('#view-study'); v.innerHTML='';
+    if(!session){
+      if(!questions.length){ v.appendChild(el('div','empty','<div class="big">📚</div><div>問題を取り込むと学習できます。</div>')); return; }
+      v.appendChild(el('div','empty','<div class="big">▶</div><div>「ホーム」から学習を始めてください。</div>'));
+      return;
+    }
+    if(!session.ids.length){
+      const done=session.done.size;
+      v.appendChild(el('div','empty','<div class="big">🎉</div><div>セッション完了！<br>'+done+' 問を学習しました。</div>'));
+      const b=el('button','btn',''); b.textContent='ホームに戻る'; b.style.marginTop='14px';
+      b.addEventListener('click',()=>{session=null; show('home');}); v.appendChild(b);
+      session=null; return;
+    }
+    const id=session.ids[0];
+    const q=questions.find(x=>x.id===id);
+    if(!q){ session.ids.shift(); return renderStudy(); }
+    renderQuiz(v,q);
+  }
+  async function renderQuiz(v,q){
+    const remaining=new Set(session.ids).size;
+    const doneN=session.done.size;
+    const denom=doneN+remaining;
+    const head=el('div','qhead');
+    head.appendChild(el('span',null,'残り '+remaining+' 問'));
+    const pr=el('div','qprog'); pr.appendChild(el('i',null,'')); pr.firstChild.style.width=(denom?Math.round(doneN/denom*100):0)+'%';
+    head.appendChild(pr);
+    head.appendChild(el('span',null,session.label));
+    v.appendChild(head);
+
+    const card=el('div','qcard');
+    const meta=el('div','qmeta');
+    if(q.category) meta.appendChild(el('span','badge cat',q.category));
+    meta.appendChild(el('span','badge yr',(q.exam||q.year||'')));
+    card.appendChild(meta);
+    card.appendChild(el('div','qtext', escapeHTML(q.question)));
+
+    if(q.hasImage){
+      const im=el('img','qimg'); im.alt='図';
+      const d=await loadImage(q.id); if(d){ im.src=d; card.appendChild(im); }
+    }
+    const ch=el('div','choices');
+    const btns=[];
+    q.choices.forEach((c,i)=>{
+      const b=el('button','choice');
+      b.appendChild(el('span','k',LETTERS[i]));
+      b.appendChild(el('span',null,escapeHTML(c)));
+      b.addEventListener('click',()=>answer(i,false));
+      ch.appendChild(b); btns.push(b);
+    });
+    card.appendChild(ch);
+    const dun=el('button','dunno','？ 分からない（不正解として記録）');
+    dun.addEventListener('click',()=>answer(-1,true));
+    card.appendChild(dun);
+    const fb=el('div'); fb.id='fb'; card.appendChild(fb);
+    v.appendChild(card);
+
+    function answer(sel, unknown){
+      const ok = (!unknown && sel===q.answer);
+      btns.forEach((b,i)=>{ b.disabled=true; if(i===q.answer)b.classList.add('correct'); if(i===sel && !ok)b.classList.add('wrong'); });
+      dun.disabled=true; dun.style.opacity=.5;
+      record(q.id, ok, unknown);
+      // queue update
+      session.ids.shift();
+      if(ok){ session.done.add(q.id); }
+      else { if(session.ids.indexOf(q.id)===-1) session.ids.push(q.id); } // re-queue at end
+      const fbx=el('div','feedback '+(ok?'ok':'ng'));
+      const title = ok?'正解':(unknown?'分からない（不正解）':'不正解');
+      fbx.appendChild(el('div','ftitle',(ok?'✓ ':'✕ ')+title+'　<span style="font-weight:600;font-size:12px;color:var(--muted)">正解：'+LETTERS[q.answer]+'</span>'));
+      if(q.explanation) fbx.appendChild(el('div','exp',escapeHTML(q.explanation)));
+      fb.appendChild(fbx);
+      const nb=el('button','nextbtn', session.ids.length? '次の問題へ' : '結果を見る');
+      nb.addEventListener('click',()=>{ $('#view-study').innerHTML=''; renderStudy(); });
+      fb.appendChild(nb);
+      nb.scrollIntoView({behavior:'smooth',block:'nearest'});
+    }
+  }
+
+  // ---------- HISTORY ----------
+  let histMode='log';
+  function allAttempts(){
+    const out=[];
+    questions.forEach(q=>{ const p=progress[q.id]; if(p) p.attempts.forEach(a=>out.push({q,a})); });
+    out.sort((x,y)=>y.a.t-x.a.t);
+    return out;
+  }
+  function renderHist(){
+    const v=$('#view-hist'); v.innerHTML='';
+    const atts=allAttempts();
+    if(!atts.length){ v.appendChild(el('div','empty','<div class="big">🗒️</div><div>まだ学習履歴がありません。</div>')); return; }
+    const seg=el('div','seg');
+    [['log','履歴ログ'],['stats','統計']].forEach(([k,lab])=>{
+      const b=el('button',null,lab); b.setAttribute('aria-pressed', histMode===k);
+      b.addEventListener('click',()=>{histMode=k; renderHist();}); seg.appendChild(b);
+    });
+    v.appendChild(seg);
+    if(histMode==='log') renderLog(v,atts); else renderStats(v,atts);
+  }
+  function fmtDT(t){
+    const d=new Date(t); const p=n=>String(n).padStart(2,'0');
+    return d.getFullYear()+'/'+p(d.getMonth()+1)+'/'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes());
+  }
+  function renderLog(v,atts){
+    const totalP=el('div','mini'); totalP.style.margin='2px 2px 10px';
+    totalP.textContent='全 '+atts.length+' 件（最新 '+Math.min(atts.length,300)+' 件を表示）';
+    v.appendChild(totalP);
+    const p=el('div','panel'); const list=el('div','loglist');
+    atts.slice(0,300).forEach(({q,a})=>{
+      const res = a.unknown?'unk':(a.ok?'ok':'ng');
+      const label = a.unknown?'分からない':(a.ok?'正解':'不正解');
+      const row=el('div','logitem');
+      row.appendChild(el('span','logdot '+res,''));
+      const m=el('div','logmain');
+      m.appendChild(el('div','l1',(q.exam||q.year||'')+(q.category?'　'+q.category:'')));
+      m.appendChild(el('div','l2',fmtDT(a.t)));
+      row.appendChild(m);
+      row.appendChild(el('span','logres '+res,label));
+      list.appendChild(row);
+    });
+    p.appendChild(list); v.appendChild(p);
+  }
+  function renderStats(v,atts){
+    let ok=0,ng=0,unk=0;
+    atts.forEach(({a})=>{ if(a.unknown)unk++; else if(a.ok)ok++; else ng++; });
+    const tot=atts.length;
+    const grid=el('div','grid');
+    grid.appendChild(el('div','stat ok','<div class="num">'+(tot?Math.round(ok/tot*100):0)+'%</div><div class="lab">正答率（'+ok+'/'+tot+'）</div>'));
+    grid.appendChild(el('div','stat unk','<div class="num">'+unk+'</div><div class="lab">「分からない」回数</div>'));
+    v.appendChild(grid);
+
+    // recent activity (last 14 days)
+    const now=new Date(); const days=[];
+    for(let i=13;i>=0;i--){ const d=new Date(now); d.setHours(0,0,0,0); d.setDate(d.getDate()-i); days.push(d.getTime()); }
+    const dayCount={}; atts.forEach(({a})=>{ const d=new Date(a.t); d.setHours(0,0,0,0); const k=d.getTime(); dayCount[k]=(dayCount[k]||0)+1; });
+    const maxd=Math.max(1,...days.map(d=>dayCount[d]||0));
+    const rp=el('div','panel'); rp.appendChild(el('h3',null,'最近14日の学習量'));
+    days.forEach(d=>{
+      const n=dayCount[d]||0; const dt=new Date(d);
+      const row=el('div','secrow');
+      row.appendChild(el('div','secname',(dt.getMonth()+1)+'/'+dt.getDate()));
+      const bar=el('div','bar'); const i=el('i',null,''); i.style.width=Math.round(n/maxd*100)+'%'; i.style.background='var(--primary)'; bar.appendChild(i);
+      row.appendChild(bar);
+      row.appendChild(el('div','barval', n+' 問'));
+      rp.appendChild(row);
+    });
+    v.appendChild(rp);
+
+    v.appendChild(breakdownPanel('分類別の正答率', 'category', atts));
+    v.appendChild(breakdownPanel('年度別の正答率', 'year', atts));
+  }
+  function breakdownPanel(title, key, atts){
+    const m={};
+    atts.forEach(({q,a})=>{ const g=q[key]||'—'; if(!m[g])m[g]={t:0,c:0}; m[g].t++; if(a.ok&&!a.unknown)m[g].c++; });
+    const keys=Object.keys(m).sort((x,y)=> (m[x].c/m[x].t) - (m[y].c/m[y].t));
+    const p=el('div','panel'); p.appendChild(el('h3',null,title));
+    keys.forEach(g=>{
+      const r=m[g]; const pct=Math.round(r.c/r.t*100);
+      const row=el('div','secrow');
+      row.appendChild(el('div','secname',g));
+      const bar=el('div','bar'); const i=el('i',null,''); i.style.width=pct+'%';
+      i.style.background = pct>=70?'var(--ok)':(pct>=50?'var(--due)':'var(--ng)');
+      bar.appendChild(i); row.appendChild(bar);
+      row.appendChild(el('div','barval', pct+'%（'+r.c+'/'+r.t+'）'));
+      p.appendChild(row);
+    });
+    return p;
+  }
+
+  // ---------- MANAGE ----------
+  function renderManage(){
+    const v=$('#view-manage'); v.innerHTML='';
+    // Google同期パネル
+    const gp=el('div','panel'); gp.appendChild(el('h3',null,'Google ドライブ同期','<small>端末間で履歴を同期</small>'));
+    const grow=el('div'); grow.style.cssText='display:flex;gap:10px;flex-wrap:wrap';
+    const onBtn=el('button','btn sm'); onBtn.textContent='Googleでログインして同期ON';
+    onBtn.addEventListener('click',enableSync);
+    const offBtn=el('button','btn sec sm'); offBtn.textContent='同期OFF';
+    offBtn.addEventListener('click',async()=>{ await disableSync(); renderManage(); });
+    grow.appendChild(onBtn); grow.appendChild(offBtn); gp.appendChild(grow);
+    const ghelp=el('div','mini'); ghelp.style.marginTop='8px';
+    ghelp.textContent= syncEnabled ? '同期中。解答するたび自動で保存されます。' : 'ログインすると他の端末と学習履歴を共有できます。';
+    gp.appendChild(ghelp);
+    v.appendChild(gp);
+    // import
+    const ip=el('div','panel'); ip.appendChild(el('h3',null,'インポート','<small>同じIDは上書き（重複しません）</small>'));
+    const fileRow=el('div','row'); fileRow.style.cssText='display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px';
+    const fileBtn=el('label','btn sec sm'); fileBtn.textContent='ファイルを選択';
+    const file=el('input'); file.type='file'; file.accept='.json,application/json'; file.style.display='none';
+    fileBtn.appendChild(file); fileRow.appendChild(fileBtn);
+    const fileName=el('span','mini','未選択'); fileRow.appendChild(fileName);
+    ip.appendChild(fileRow);
+    const ta=el('textarea'); ta.placeholder='ここに JSON を貼り付けても取り込めます…'; ip.appendChild(ta);
+    const imp=el('button','btn'); imp.textContent='取り込む'; imp.style.marginTop='10px'; ip.appendChild(imp);
+    const imsg=el('div','msg'); ip.appendChild(imsg);
+    let fileText='';
+    file.addEventListener('change',()=>{
+      const f=file.files[0]; if(!f)return; fileName.textContent=f.name;
+      const r=new FileReader(); r.onload=()=>{fileText=r.result;}; r.readAsText(f);
+    });
+    imp.addEventListener('click',async()=>{
+      const txt=(ta.value.trim()||fileText||'').trim();
+      if(!txt){ flash(imsg,'bad','JSON を貼り付けるかファイルを選択してください。'); return; }
+      try{
+        const data=JSON.parse(txt);
+        const arr=Array.isArray(data)?data:(data.questions||[]);
+        if(!arr.length){ flash(imsg,'bad','questions が見つかりません。'); return; }
+        const res=await upsert(arr);
+        flash(imsg,'good','取り込み完了：新規 '+res.added+' 問・更新 '+res.updated+' 問（合計 '+questions.length+' 問）');
+        ta.value=''; fileText=''; fileName.textContent='未選択';
+        renderManage();
+      }catch(e){ flash(imsg,'bad','JSON の解析に失敗しました：'+e.message); }
+    });
+    v.appendChild(ip);
+
+    // current data summary + export/reset
+    const sp=el('div','panel'); sp.appendChild(el('h3',null,'登録済みの問題','<small>'+questions.length+' 問</small>'));
+    const byYear={}; questions.forEach(q=>{byYear[q.year||'—']=(byYear[q.year||'—']||0)+1;});
+    Object.keys(byYear).forEach(y=>{
+      const row=el('div','secrow'); row.appendChild(el('div','secname',y));
+      row.appendChild(el('div',null,'')); row.lastChild.style.flex='1';
+      row.appendChild(el('div','barval', byYear[y]+' 問'));
+      sp.appendChild(row);
+    });
+    const actions=el('div'); actions.style.cssText='display:flex;gap:10px;flex-wrap:wrap;margin-top:14px';
+    const ex=el('button','btn sec sm'); ex.textContent='エクスポート（バックアップ）';
+    ex.addEventListener('click',exportAll); actions.appendChild(ex);
+    const rs=el('button','btn danger sm'); rs.textContent='全データを削除';
+    rs.addEventListener('click',resetAll); actions.appendChild(rs);
+    sp.appendChild(actions);
+    const smsg=el('div','msg'); smsg.id='smsg'; sp.appendChild(smsg);
+    v.appendChild(sp);
+
+    // manual add
+    const ap=el('div','panel'); ap.appendChild(el('h3',null,'問題を手動で追加'));
+    ap.appendChild(fld('年度（例：R6春）','m_year'));
+    ap.appendChild(fld('分類（例：セキュリティ）','m_cat'));
+    ap.appendChild(fldArea('問題文','m_q'));
+    for(let i=0;i<4;i++) ap.appendChild(fld('選択肢 '+LETTERS[i],'m_c'+i));
+    const al=el('label','fld'); al.textContent='正解'; ap.appendChild(al);
+    const sel=el('select'); sel.id='m_ans'; LETTERS.forEach((L,i)=>{const o=el('option',null,L);o.value=i;sel.appendChild(o);}); ap.appendChild(sel);
+    ap.appendChild(fldArea('解説','m_exp'));
+    const add=el('button','btn'); add.textContent='追加する'; add.style.marginTop='12px'; ap.appendChild(add);
+    const amsg=el('div','msg'); ap.appendChild(amsg);
+    add.addEventListener('click',async()=>{
+      const q=$('#m_q').value.trim(); const cs=[0,1,2,3].map(i=>$('#m_c'+i).value.trim());
+      if(!q||cs.some(c=>!c)){ flash(amsg,'bad','問題文と4つの選択肢は必須です。'); return; }
+      const rec={id:'man-'+Date.now(), section:'午前1', year:$('#m_year').value.trim()||'手動', exam:($('#m_year').value.trim()||'手動')+' 問', category:$('#m_cat').value.trim()||'未分類', question:q, choices:cs, answer:parseInt($('#m_ans').value,10), explanation:$('#m_exp').value.trim()};
+      await upsert([rec]);
+      flash(amsg,'good','追加しました（合計 '+questions.length+' 問）');
+      ['m_q','m_c0','m_c1','m_c2','m_c3','m_exp'].forEach(id=>$('#'+id).value='');
+      renderManage();
+    });
+    v.appendChild(ap);
+  }
+  function fld(label,id){ const w=el('div'); const l=el('label','fld',label); const i=el('input'); i.id=id; w.appendChild(l); w.appendChild(i); return w; }
+  function fldArea(label,id){ const w=el('div'); const l=el('label','fld',label); const t=el('textarea'); t.id=id; t.style.minHeight='80px'; w.appendChild(l); w.appendChild(t); return w; }
+
+  function normAnswer(a){
+    if(typeof a==='number') return a>=1&&a<=4 ? a-1 : a;          // accept 0-3 or 1-4
+    if(typeof a==='string'){ const t=a.trim(); if(t in KMAP) return KMAP[t]; const n=parseInt(t,10); if(!isNaN(n)) return n>=1&&n<=4?n-1:n; }
+    return 0;
+  }
+  async function upsert(arr){
+    let added=0,updated=0;
+    const byId={}; questions.forEach((q,i)=>byId[q.id]=i);
+    for(const raw of arr){
+      const id = raw.id || ('imp-'+Math.random().toString(36).slice(2,10));
+      const rec={
+        id, section: raw.section||'午前1', year: raw.year||'', exam: raw.exam||raw.year||'',
+        category: raw.category||'未分類', question: raw.question||'',
+        choices:(raw.choices||[]).slice(0,4), answer: normAnswer(raw.answer),
+        explanation: raw.explanation||'', hasImage: !!raw.image
+      };
+      if(raw.image){ await jset('kakomon:img:'+id, raw.image); imgCache[id]=raw.image; }
+      if(id in byId){ questions[byId[id]]=rec; updated++; }
+      else { byId[id]=questions.length; questions.push(rec); added++; }
+    }
+    await jset('kakomon:questions', questions);
+    if(typeof schedulePush==='function') schedulePush();
+    return {added, updated};
+  }
+  function exportAll(){
+    const out={questions:questions.map(q=>{ const o=Object.assign({},q); if(q.hasImage&&imgCache[q.id])o.image=imgCache[q.id]; delete o.hasImage; return o; }), progress};
+    const blob=new Blob([JSON.stringify(out)],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='sc_kakomon_backup.json'; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+    flash($('#smsg'),'good','エクスポートしました（画像・進捗を含む）。');
+  }
+  async function resetAll(){
+    if(!confirm('登録済みの問題と学習履歴をすべて削除します。よろしいですか？')) return;
+    for(const q of questions){ if(q.hasImage) await jdel('kakomon:img:'+q.id); }
+    questions=[]; progress={}; session=null;
+    Object.keys(imgCache).forEach(k=>delete imgCache[k]);
+    await jset('kakomon:questions', questions); await jset('kakomon:progress', progress);
+    flash($('#smsg'),'good','削除しました。');
+    renderManage();
+  }
+  function flash(node,kind,msg){ node.className='msg show '+kind; node.textContent=msg; }
+
+  function escapeHTML(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // ================= Google Drive Sync =================
+  let tokenClient=null, accessToken=null, driveFileId=null;
+  let syncEnabled=false, pushTimer=null, syncBusy=false;
+  const deviceId = (function(){
+    let d=null; try{ d=localStorage.getItem('kakomon:deviceId'); }catch(e){}
+    if(!d){ d='dev-'+Math.random().toString(36).slice(2); try{ localStorage.setItem('kakomon:deviceId',d); }catch(e){} }
+    return d;
+  })();
+
+  function waitForGIS(){
+    return new Promise((resolve,reject)=>{
+      if(window.google && google.accounts && google.accounts.oauth2) return resolve();
+      let n=0; const t=setInterval(()=>{
+        if(window.google && google.accounts && google.accounts.oauth2){ clearInterval(t); resolve(); }
+        else if(++n>100){ clearInterval(t); reject(new Error('GIS load timeout')); }
+      },100);
+    });
+  }
+  function ensureTokenClient(){
+    if(tokenClient) return;
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID, scope: DRIVE_SCOPE, callback: ()=>{}
+    });
+  }
+  function requestToken(interactive){
+    return new Promise((resolve,reject)=>{
+      ensureTokenClient();
+      tokenClient.callback=(resp)=>{
+        if(resp && resp.error){ reject(resp); return; }
+        accessToken = resp.access_token; resolve(accessToken);
+      };
+      try{ tokenClient.requestAccessToken({ prompt: interactive ? 'consent' : '' }); }
+      catch(e){ reject(e); }
+    });
+  }
+
+  async function driveFind(){
+    const q=encodeURIComponent("name='"+SYNC_FILENAME+"'");
+    const url='https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q='+q+'&fields=files(id,modifiedTime)';
+    const r=await fetch(url,{headers:{Authorization:'Bearer '+accessToken}});
+    if(r.status===401) throw {status:401};
+    const j=await r.json(); return (j.files&&j.files[0])||null;
+  }
+  async function driveDownload(id){
+    const r=await fetch('https://www.googleapis.com/drive/v3/files/'+id+'?alt=media',{headers:{Authorization:'Bearer '+accessToken}});
+    if(r.status===401) throw {status:401};
+    if(!r.ok) return null;
+    return await r.json();
+  }
+  async function driveUpload(content){
+    const body=JSON.stringify(content);
+    if(driveFileId){
+      const r=await fetch('https://www.googleapis.com/upload/drive/v3/files/'+driveFileId+'?uploadType=media',
+        {method:'PATCH',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body});
+      if(r.status===401) throw {status:401};
+    } else {
+      const boundary='kakomon'+Date.now();
+      const meta={name:SYNC_FILENAME, parents:['appDataFolder']};
+      const multipart='--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify(meta)
+        +'\r\n--'+boundary+'\r\nContent-Type: application/json\r\n\r\n'+body+'\r\n--'+boundary+'--';
+      const r=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
+        {method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'multipart/related; boundary='+boundary},body:multipart});
+      if(r.status===401) throw {status:401};
+      const j=await r.json(); driveFileId=j.id;
+    }
+  }
+
+  function buildSyncBlob(){
+    const customQ = questions.filter(q=>!bundledIds.has(q.id));
+    const customImg={};
+    customQ.forEach(q=>{ if(q.hasImage && imgCache[q.id]) customImg[q.id]=imgCache[q.id]; });
+    return { schema:SCHEMA_VERSION, updatedAt:Date.now(), deviceId, progress, customQuestions:customQ, customImages:customImg };
+  }
+  function mergeProgress(a,b){
+    const out={}; const ids=new Set([...Object.keys(a||{}),...Object.keys(b||{})]);
+    for(const id of ids){
+      const A=(a&&a[id]&&a[id].attempts)?a[id].attempts:[];
+      const B=(b&&b[id]&&b[id].attempts)?b[id].attempts:[];
+      const m=new Map(); [...A,...B].forEach(x=>{ if(x&&typeof x.t==='number') m.set(x.t,x); });
+      const att=[...m.values()].sort((x,y)=>x.t-y.t);
+      let level=0,due=0;
+      att.forEach(x=>{ if(x.ok){ level=Math.min(level+1,INTERVALS.length-1); due=x.t+INTERVALS[level]*DAY; } else { level=0; due=x.t+DAY; } });
+      out[id]={attempts:att, level, due};
+    }
+    return out;
+  }
+  async function applyRemote(remote){
+    if(!remote) return;
+    progress = mergeProgress(progress, remote.progress);
+    await jset('kakomon:progress', progress);
+    if(Array.isArray(remote.customQuestions)){
+      for(const rq of remote.customQuestions){
+        if(!rq || !rq.id || bundledIds.has(rq.id)) continue;
+        const idx=questions.findIndex(q=>q.id===rq.id);
+        if(idx<0){ questions.push(rq); }
+        else if((rq.updatedAt||0) >= (questions[idx].updatedAt||0)){ questions[idx]=rq; }
+        if(remote.customImages && remote.customImages[rq.id]){
+          imgCache[rq.id]=remote.customImages[rq.id];
+          await jset('kakomon:img:'+rq.id, remote.customImages[rq.id]);
+        }
+      }
+      await jset('kakomon:questions', questions);
+    }
+  }
+  async function pullMergePush(){
+    if(syncBusy) return; syncBusy=true;
+    try{
+      const f=await driveFind();
+      if(f){ driveFileId=f.id; const remote=await driveDownload(f.id); await applyRemote(remote); }
+      await driveUpload(buildSyncBlob());
+      setSyncStatus('ok');
+    } finally { syncBusy=false; }
+  }
+  function schedulePush(){
+    if(!syncEnabled) return;
+    clearTimeout(pushTimer);
+    pushTimer=setTimeout(async ()=>{
+      try{ await pullMergePush(); }
+      catch(e){
+        if(e && e.status===401){
+          try{ await requestToken(false); await pullMergePush(); }
+          catch(_){ setSyncStatus('reauth'); }
+        } else { setSyncStatus('error'); }
+      }
+    }, 4000);
+  }
+
+  function setSyncStatus(s){
+    const n=$('#syncNote'); if(!n) return;
+    if(s==='ok'){ n.textContent='☁ 同期ON'; n.className='persist-note'; }
+    else if(s==='reauth'){ n.textContent='⚠ 再ログインが必要'; n.className='persist-note warn'; }
+    else if(s==='error'){ n.textContent='⚠ 同期エラー'; n.className='persist-note warn'; }
+    else { n.textContent='☁ 同期OFF'; n.className='persist-note'; }
+  }
+
+  async function enableSync(){
+    try{
+      await waitForGIS();
+      await requestToken(true);
+      syncEnabled=true;
+      try{ localStorage.setItem('kakomon:syncEnabled','1'); }catch(e){}
+      await pullMergePush();
+      show('home');
+    }catch(e){ console.error(e); setSyncStatus('error'); alert('Googleログインに失敗しました。'); }
+  }
+  async function disableSync(){
+    syncEnabled=false;
+    try{ localStorage.removeItem('kakomon:syncEnabled'); }catch(e){}
+    if(accessToken && window.google){ try{ google.accounts.oauth2.revoke(accessToken,()=>{}); }catch(e){} }
+    accessToken=null; driveFileId=null; setSyncStatus('off');
+  }
+  async function initSync(){
+    let want=false; try{ want=localStorage.getItem('kakomon:syncEnabled')==='1'; }catch(e){}
+    setSyncStatus(want?'reauth':'off');
+    if(!want) return;
+    try{
+      await waitForGIS();
+      await requestToken(false);
+      syncEnabled=true;
+      await pullMergePush();
+    }catch(e){ setSyncStatus('reauth'); }
+  }
+  // ================= /Google Drive Sync =================
+
+  // ---------- boot ----------
+  (async function init(){
+    const note=$('#persistNote');
+    if(persistent){ note.textContent='✓ 保存有効'; }
+    else { note.textContent='⚠ 一時保存（このセッションのみ）'; note.classList.add('warn'); }
+    questions = await jget('kakomon:questions', []);
+    progress = await jget('kakomon:progress', {});
+    // ensure shape
+    questions.forEach(q=>{ if(q.hasImage===undefined) q.hasImage=false; });
+
+    // 標準問題を data/ から読み込み（IDを bundledIds に登録しつつ upsert で取り込む）
+    try{
+      const man = await fetch('./data/index.json').then(r=>r.json());
+      for(const d of (man.datasets||[])){
+        try{
+          const dj = await fetch('./data/'+d.file).then(r=>r.json());
+          const arr = Array.isArray(dj)?dj:(dj.questions||[]);
+          arr.forEach(q=>{ if(q.id) bundledIds.add(q.id); });
+          if(arr.length) await upsert(arr);
+        }catch(e){ console.error('dataset load failed', d.file, e); }
+      }
+    }catch(e){ console.error('manifest load failed', e); }
+
+    show('home');
+
+    // Google同期（ログイン済みなら自動で読み込み→マージ）
+    try{ await initSync(); }catch(e){ console.error(e); }
+
+    // PWA: Service Worker 登録
+    if('serviceWorker' in navigator){ try{ navigator.serviceWorker.register('./sw.js'); }catch(e){} }
+  })();
+})();
+</script>
+
+</body>
+</html>

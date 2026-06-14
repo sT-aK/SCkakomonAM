@@ -1,0 +1,8 @@
+{
+  "datasets": [
+    { "file": "sc_r3a_am1.json" },
+    { "file": "sc_r4a_am1.json" },
+    { "file": "sc_r5h_am1.json" },
+    { "file": "sc_r6h_am1.json" }
+  ]
+}
