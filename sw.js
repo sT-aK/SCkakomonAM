@@ -1,9 +1,10 @@
-const CACHE = 'kakomon-v1';
+const CACHE = 'kakomon-v2';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest',
   './data/index.json',
   './data/sc_r3a_am1.json', './data/sc_r4a_am1.json',
-  './data/sc_r5h_am1.json', './data/sc_r6h_am1.json'
+  './data/sc_r5h_am1.json', './data/sc_r6h_am1.json',
+  './data/sc_r7a_am1.json'
 ];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));

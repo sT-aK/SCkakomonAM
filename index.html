@@ -578,8 +578,8 @@
   function fldArea(label,id){ const w=el('div'); const l=el('label','fld',label); const t=el('textarea'); t.id=id; t.style.minHeight='80px'; w.appendChild(l); w.appendChild(t); return w; }
 
   function normAnswer(a){
-    if(typeof a==='number') return a>=1&&a<=4 ? a-1 : a;          // accept 0-3 or 1-4
-    if(typeof a==='string'){ const t=a.trim(); if(t in KMAP) return KMAP[t]; const n=parseInt(t,10); if(!isNaN(n)) return n>=1&&n<=4?n-1:n; }
+    if(typeof a==='number') return (a>=0&&a<=3) ? a : (a>=1&&a<=4 ? a-1 : 0);
+    if(typeof a==='string'){ const t=a.trim(); if(t in KMAP) return KMAP[t]; const n=parseInt(t,10); if(!isNaN(n)) return (n>=0&&n<=3)?n:(n>=1&&n<=4?n-1:0); }
     return 0;
   }
   async function upsert(arr){
