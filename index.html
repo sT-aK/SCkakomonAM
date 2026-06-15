@@ -195,7 +195,7 @@
   let questions = [];        // {id,section,year,exam,category,question,choices[4],answer,explanation,hasImage}
   let progress = {};         // id -> {attempts:[{t,ok,unknown}], level, due}
   const imgCache = {};       // id -> dataURL
-  let session = null;        // {ids:[], idx, total, doneIds:Set, filterLabel}
+  let session = null;        // {ids:[], total, done:Set, seen:Set, label}
   const bundledIds = new Set(); // data/ から読み込んだ標準問題のID（同期対象外の判定に使う）
 
   async function loadImage(id){
@@ -317,7 +317,7 @@
       $('#view-study').appendChild(el('div','empty','<div class="big">🎉</div><div>対象の問題がありません。<br>復習期限が来たらここに表示されます。</div>'));
       return;
     }
-    session={ids:ids.slice(), idx:0, total:ids.length, done:new Set(), label:label||'おすすめ'};
+    session={ids:ids.slice(), total:ids.length, done:new Set(), seen:new Set(), label:label||'おすすめ'};
     show('study');
   }
   function renderStudy(){
@@ -340,14 +340,19 @@
     renderQuiz(v,q);
   }
   async function renderQuiz(v,q){
-    const remaining=new Set(session.ids).size;
-    const doneN=session.done.size;
-    const denom=doneN+remaining;
+    const seenN=session.seen.size;
+    const remaining=Math.max(0, session.total-seenN);
+    const denom=session.total;
     const head=el('div','qhead');
     head.appendChild(el('span',null,'残り '+remaining+' 問'));
-    const pr=el('div','qprog'); pr.appendChild(el('i',null,'')); pr.firstChild.style.width=(denom?Math.round(doneN/denom*100):0)+'%';
+    const pr=el('div','qprog'); pr.appendChild(el('i',null,'')); pr.firstChild.style.width=(denom?Math.round(seenN/denom*100):0)+'%';
     head.appendChild(pr);
     head.appendChild(el('span',null,session.label));
+    const endBtn=el('button','btn sec sm','終了'); endBtn.style.flex='none';
+    endBtn.addEventListener('click',()=>{
+      if(confirm('学習を終了しますか？\nここまでの回答は記録されています。')){ session=null; show('home'); }
+    });
+    head.appendChild(endBtn);
     v.appendChild(head);
 
     const card=el('div','qcard');
@@ -384,6 +389,7 @@
       record(q.id, ok, unknown);
       // queue update
       session.ids.shift();
+      session.seen.add(q.id);
       if(ok){ session.done.add(q.id); }
       else { if(session.ids.indexOf(q.id)===-1) session.ids.push(q.id); } // re-queue at end
       const fbx=el('div','feedback '+(ok?'ok':'ng'));
