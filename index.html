@@ -274,6 +274,26 @@
   }
   root.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>show(t.dataset.view)));
 
+  // ---------- スワイプでタブ切り替え（タッチデバイス） ----------
+  (function(){
+    const VIEWS=['home','study','hist','manage'];
+    const MIN_X=55, MAX_Y_RATIO=0.6; // 水平55px以上、かつ垂直より水平が優勢
+    let sx=0, sy=0, locked=false;
+    root.addEventListener('touchstart', e=>{
+      if(e.touches.length!==1){locked=true; return;}
+      locked=false; sx=e.touches[0].clientX; sy=e.touches[0].clientY;
+    }, {passive:true});
+    root.addEventListener('touchend', e=>{
+      if(locked||e.changedTouches.length!==1) return;
+      const dx=e.changedTouches[0].clientX-sx, dy=e.changedTouches[0].clientY-sy;
+      if(Math.abs(dx)<MIN_X || Math.abs(dy)>Math.abs(dx)*MAX_Y_RATIO) return;
+      const cur=VIEWS.indexOf([...root.querySelectorAll('.tab')].find(t=>t.getAttribute('aria-selected')==='true')?.dataset.view);
+      if(cur<0) return;
+      const next=dx<0 ? Math.min(cur+1,VIEWS.length-1) : Math.max(cur-1,0);
+      if(next!==cur) show(VIEWS[next]);
+    }, {passive:true});
+  })();
+
   // ---------- HOME ----------
   function renderHome(){
     const v=$('#view-home'); v.innerHTML='';
