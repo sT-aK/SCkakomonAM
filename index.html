@@ -66,6 +66,15 @@
   .chk small{font-weight:500; color:var(--muted); flex:none;}
   .chk.on{border-color:var(--primary); background:var(--primary-soft);}
   .chkbar{display:flex; gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap;}
+  .badge.diff-hard{background:var(--ng-soft); color:var(--ng);}
+  .badge.diff-normal{background:var(--due-soft); color:var(--due);}
+  .badge.diff-easy{background:var(--ok-soft); color:var(--ok);}
+  .diff-row{display:flex; gap:7px; align-items:center; flex-wrap:wrap; margin-top:11px;}
+  .diff-row span{font-size:12px; color:var(--muted); font-weight:600; flex:none;}
+  .diff-btn{border:1.5px solid var(--line); background:#fff; border-radius:9px; padding:8px 0; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; transition:.12s; color:var(--muted); flex:1; min-width:64px; text-align:center;}
+  .diff-btn.on-hard{background:var(--ng-soft); border-color:var(--ng); color:var(--ng);}
+  .diff-btn.on-normal{background:var(--due-soft); border-color:var(--due); color:var(--due);}
+  .diff-btn.on-easy{background:var(--ok-soft); border-color:var(--ok); color:var(--ok);}
   .checkrow{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin-top:12px;}
   .checkrow input{width:16px; height:16px; accent-color:var(--primary);}
   .qhead{display:flex; align-items:center; gap:10px; margin-bottom:12px; font-size:12.5px; color:var(--muted); flex-wrap:wrap;}
@@ -186,6 +195,7 @@
     'sc-r7a-am1-q01','sc-r7a-am1-q03','sc-r7a-am1-q06','sc-r7a-am1-q07','sc-r7a-am1-q10','sc-r7a-am1-q19','sc-r7a-am1-q29'
   ]);
   const isCalcQ = (id, raw)=> (raw && typeof raw.calc==='boolean') ? raw.calc : CALC_IDS.has(id);
+  const DIFF_META = {hard:{l:'ハード',cls:'diff-hard'}, normal:{l:'ノーマル',cls:'diff-normal'}, easy:{l:'イージー',cls:'diff-easy'}};
 
   // ---------- storage (localStorage, with window.storage / memory fallback) ----------
   const MEM = {};
@@ -214,12 +224,18 @@
   let progress = {};         // id -> {attempts:[{t,ok,unknown}], level, due}
   const imgCache = {};       // id -> dataURL
   let session = null;        // {ids:[], total, done:Set, seen:Set, label}
+  let difficulty = {};       // id -> 'hard'|'normal'|'easy'
   const bundledIds = new Set(); // data/ から読み込んだ標準問題のID（同期対象外の判定に使う）
 
   async function loadImage(id){
     if(id in imgCache) return imgCache[id];
     const v = await jget('kakomon:img:'+id, null);
     imgCache[id]=v; return v;
+  }
+  async function setDiff(id, val){
+    if(val) difficulty[id]=val; else delete difficulty[id];
+    await jset('kakomon:difficulty', difficulty);
+    if(typeof schedulePush==='function') schedulePush();
   }
 
   // ---------- SRS ----------
@@ -247,6 +263,7 @@
     if(f.categories && f.categories.length && f.categories.indexOf(q.category)<0) return false;
     if(f.calc==='yes' && !q.calc) return false;
     if(f.calc==='no' && q.calc) return false;
+    if(f.diffs && f.diffs.length){ const qd=difficulty[q.id]||'unset'; if(f.diffs.indexOf(qd)<0) return false; }
     return true;
   }
   function buildQueue(filter, includeAll){
@@ -360,6 +377,15 @@
       const calcYesChip=chip(calcG,'yes','計算問題',calcN,true), calcNoChip=chip(calcG,'no','計算以外',nonCalcN,true);
       cp.appendChild(calcG);
 
+      cp.appendChild(el('div','subhead','難易度'));
+      const diffG=el('div','chkgrid'); diffG.style.gridTemplateColumns='repeat(2,1fr)';
+      const diffChips={};
+      [['hard','ハード'],['normal','ノーマル'],['easy','イージー'],['unset','未設定']].forEach(([v,lbl])=>{
+        const cnt=questions.filter(q=>(difficulty[q.id]||'unset')===v).length;
+        diffChips[v]=chip(diffG, v, lbl, cnt, true);
+      });
+      cp.appendChild(diffG);
+
       const bar=el('div','chkbar');
       const selAll=el('button','btn sec sm'); selAll.textContent='分類を全選択';
       const selNone=el('button','btn sec sm'); selNone.textContent='分類を全解除';
@@ -374,12 +400,15 @@
         const sc=catChips.filter(c=>c.classList.contains('on')).map(c=>c.dataset.val);
         const yes=calcYesChip.classList.contains('on'), no=calcNoChip.classList.contains('on');
         let calc=null; if(yes&&!no)calc='yes'; else if(no&&!yes)calc='no';
-        return {categories:sc, calc, yes, no};
+        const dsel=Object.keys(diffChips).filter(v=>diffChips[v].classList.contains('on'));
+        // 全4つ選択中はフィルタなし（diffs=null）
+        const diffs=(dsel.length===4||dsel.length===0)?null:dsel;
+        return {categories:sc, calc, yes, no, diffs, dsel};
       }
-      function matchCount(f){ return questions.filter(q=>matchFilter(q,{categories:f.categories, calc:f.calc})).length; }
+      function matchCount(f){ return questions.filter(q=>matchFilter(q,{categories:f.categories, calc:f.calc, diffs:f.diffs})).length; }
       function updateCount(){
         const f=selected();
-        const n=(!f.categories.length || (!f.yes&&!f.no)) ? 0 : matchCount(f);
+        const n=(!f.categories.length || (!f.yes&&!f.no) || f.dsel.length===0) ? 0 : matchCount(f);
         startB.innerHTML='選択した区分で学習<small>'+n+' 問</small>';
         startB.disabled=(n===0);
       }
@@ -387,9 +416,11 @@
         const f=selected();
         if(!f.categories.length){ flash(cmsg,'bad','分類を1つ以上選択してください。'); return; }
         if(!f.yes&&!f.no){ flash(cmsg,'bad','「計算問題」「計算以外」のいずれかを選択してください。'); return; }
+        if(!f.dsel.length){ flash(cmsg,'bad','難易度を1つ以上選択してください。'); return; }
+        const diffLab=f.diffs ? '・'+(f.diffs.map(d=>DIFF_META[d]?DIFF_META[d].l:'未設定').join('/')) : '';
         const lab=(f.categories.length===cats.length?'全分類':(f.categories.length===1?f.categories[0]:f.categories.length+'分類'))
-          + (f.calc==='yes'?'・計算':f.calc==='no'?'・計算以外':'');
-        startSession({categories:f.categories, calc:f.calc}, true, lab);
+          + (f.calc==='yes'?'・計算':f.calc==='no'?'・計算以外':'') + diffLab;
+        startSession({categories:f.categories, calc:f.calc, diffs:f.diffs}, true, lab);
       });
       updateCount();
       v.appendChild(cp);
@@ -447,6 +478,9 @@
     const meta=el('div','qmeta');
     if(q.category) meta.appendChild(el('span','badge cat',q.category));
     meta.appendChild(el('span','badge yr',(q.exam||q.year||'')));
+    const diffBadgeSlot=el('span'); // 難易度バッジ（回答前は現在設定値を表示）
+    function refreshDiffBadge(){ const d=difficulty[q.id]; diffBadgeSlot.innerHTML=d?'<span class="badge '+DIFF_META[d].cls+'">'+DIFF_META[d].l+'</span>':''; }
+    refreshDiffBadge(); meta.appendChild(diffBadgeSlot);
     card.appendChild(meta);
     card.appendChild(el('div','qtext', escapeHTML(q.question)));
 
@@ -485,6 +519,21 @@
       fbx.appendChild(el('div','ftitle',(ok?'✓ ':'✕ ')+title+'　<span style="font-weight:600;font-size:12px;color:var(--muted)">正解：'+LETTERS[q.answer]+'</span>'));
       if(q.explanation) fbx.appendChild(el('div','exp',escapeHTML(q.explanation)));
       fb.appendChild(fbx);
+      // 難易度ピッカー
+      const dr=el('div','diff-row'); dr.appendChild(el('span',null,'難易度：'));
+      const dBtns={};
+      function updateDiffBtns(){
+        const cur=difficulty[q.id];
+        Object.keys(dBtns).forEach(v=>{ dBtns[v].className='diff-btn'+(cur===v?' on-'+v:''); });
+        refreshDiffBadge();
+      }
+      Object.entries(DIFF_META).forEach(([v,m])=>{
+        const b=el('button','diff-btn',m.l); dBtns[v]=b;
+        b.addEventListener('click',()=>{ setDiff(q.id, difficulty[q.id]===v?null:v); updateDiffBtns(); });
+        dr.appendChild(b);
+      });
+      updateDiffBtns();
+      fb.appendChild(dr);
       const nb=el('button','nextbtn', session.ids.length? '次の問題へ' : '結果を見る');
       nb.addEventListener('click',()=>{ $('#view-study').innerHTML=''; renderStudy(); });
       fb.appendChild(nb);
@@ -786,7 +835,7 @@
     const customQ = questions.filter(q=>!bundledIds.has(q.id));
     const customImg={};
     customQ.forEach(q=>{ if(q.hasImage && imgCache[q.id]) customImg[q.id]=imgCache[q.id]; });
-    return { schema:SCHEMA_VERSION, updatedAt:Date.now(), deviceId, progress, customQuestions:customQ, customImages:customImg };
+    return { schema:SCHEMA_VERSION, updatedAt:Date.now(), deviceId, progress, difficulty, customQuestions:customQ, customImages:customImg };
   }
   function mergeProgress(a,b){
     const out={}; const ids=new Set([...Object.keys(a||{}),...Object.keys(b||{})]);
@@ -805,6 +854,10 @@
     if(!remote) return;
     progress = mergeProgress(progress, remote.progress);
     await jset('kakomon:progress', progress);
+    if(remote.difficulty && typeof remote.difficulty==='object'){
+      Object.assign(difficulty, remote.difficulty);
+      await jset('kakomon:difficulty', difficulty);
+    }
     if(Array.isArray(remote.customQuestions)){
       for(const rq of remote.customQuestions){
         if(!rq || !rq.id || bundledIds.has(rq.id)) continue;
@@ -886,6 +939,7 @@
     else { note.textContent='⚠ 一時保存（このセッションのみ）'; note.classList.add('warn'); }
     questions = await jget('kakomon:questions', []);
     progress = await jget('kakomon:progress', {});
+    difficulty = await jget('kakomon:difficulty', {});
     // ensure shape
     questions.forEach(q=>{ if(q.hasImage===undefined) q.hasImage=false; if(q.calc===undefined) q.calc=isCalcQ(q.id, q); });
 
