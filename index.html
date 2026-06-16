@@ -26,13 +26,13 @@
   #app-root{font-family:var(--jp); color:var(--ink); background:var(--paper); -webkit-font-smoothing:antialiased; line-height:1.6; min-height:100vh;}
   #app-root *{box-sizing:border-box;}
   .wrap{max-width:760px; margin:0 auto; padding:18px 16px 90px;}
-  .topbar{display:flex; align-items:center; gap:12px; padding:6px 2px 14px;}
+  .topbar{position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:12px; padding:max(8px,env(safe-area-inset-top)) 2px 12px; background:var(--paper); box-shadow:0 6px 12px -9px rgba(20,18,30,.22);}
   .logo{font-weight:800; font-size:19px; letter-spacing:.02em;}
   .logo .dot{color:var(--primary);}
   .persist-note{margin-left:auto; font-size:11.5px; color:var(--muted); background:#fff; border:1px solid var(--line); padding:4px 9px; border-radius:999px;}
   .persist-note.warn{color:var(--due); border-color:var(--due-soft); background:var(--due-soft);}
-  .tabs{display:flex; gap:6px; background:#efede7; padding:5px; border-radius:12px; margin-bottom:18px;}
-  .tab{flex:1; text-align:center; padding:9px 4px; border-radius:8px; font-size:13.5px; font-weight:600; color:var(--muted); cursor:pointer; border:none; background:transparent; font-family:inherit; transition:.15s;}
+  .tabs{position:fixed; left:0; right:0; bottom:0; z-index:50; max-width:760px; margin:0 auto; display:flex; gap:6px; background:#efede7; padding:6px max(10px,env(safe-area-inset-left)) calc(6px + env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-right)); border-radius:14px 14px 0 0; box-shadow:0 -3px 16px rgba(20,18,30,.10);}
+  .tab{flex:1; text-align:center; padding:11px 4px; border-radius:8px; font-size:13.5px; font-weight:600; color:var(--muted); cursor:pointer; border:none; background:transparent; font-family:inherit; transition:.15s;}
   .tab[aria-selected="true"]{background:#fff; color:var(--ink); box-shadow:var(--shadow);}
   .view{display:none;} .view.active{display:block;}
   .grid{display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-bottom:16px;}
@@ -58,11 +58,12 @@
   .startbtn.wide{grid-column:1/-1; font-size:15px; padding:15px;}
   .startbtn:disabled{opacity:.45; cursor:not-allowed;}
   .subhead{font-size:12px; font-weight:700; color:var(--muted); margin:14px 0 6px;}
-  .chkgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(138px,1fr)); gap:8px; margin:2px 0;}
-  .chk{display:flex; align-items:center; gap:8px; background:#fff; border:1.5px solid var(--line); border-radius:10px; padding:9px 11px; font-size:13px; font-weight:600; cursor:pointer; min-height:42px;}
-  .chk input{width:17px; height:17px; accent-color:var(--primary); flex:none;}
-  .chk span{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .chk small{font-weight:500; color:var(--muted); margin-left:auto; flex:none;}
+  .chkgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; margin:2px 0;}
+  .chk{display:flex; align-items:center; gap:9px; background:#fff; border:1.5px solid var(--line); border-radius:10px; padding:10px 12px; font-size:13px; font-weight:600; cursor:pointer; min-height:46px; user-select:none; -webkit-user-select:none; transition:.12s;}
+  .chk .mk{flex:none; width:16px; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:800; line-height:1; color:var(--primary);}
+  .chk.on .mk::after{content:'✓';}
+  .chk .nm{flex:1; min-width:0; white-space:normal; word-break:break-word; line-height:1.25;}
+  .chk small{font-weight:500; color:var(--muted); flex:none;}
   .chk.on{border-color:var(--primary); background:var(--primary-soft);}
   .chkbar{display:flex; gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap;}
   .checkrow{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin-top:12px;}
@@ -128,7 +129,7 @@
   /* ---- mobile tuning ---- */
   html{ -webkit-text-size-adjust:100%; }
   textarea,input,select{ font-size:16px; }
-  .wrap{ padding-left:max(16px,env(safe-area-inset-left)); padding-right:max(16px,env(safe-area-inset-right)); padding-bottom:max(90px,env(safe-area-inset-bottom)); }
+  .wrap{ padding-left:max(16px,env(safe-area-inset-left)); padding-right:max(16px,env(safe-area-inset-right)); padding-bottom:calc(86px + env(safe-area-inset-bottom)); }
   button{ -webkit-tap-highlight-color:transparent; }
   .tab{ min-height:40px; }
   .choice{ min-height:48px; }
@@ -318,44 +319,40 @@
     if(cats.length){
       const cp=el('div','panel'); cp.appendChild(el('h3',null,'区分を選んで学習','<small>複数選択可・弱点順で出題</small>'));
 
+      // タップ／クリックで選択を切り替えるチップ（チェックボックスは使わない）
+      function chip(grid, val, label, count, on){
+        const c=el('div','chk'+(on?' on':'')); c.dataset.val=val;
+        c.appendChild(el('span','mk',''));
+        c.appendChild(el('span','nm', escapeHTML(label)));
+        if(count!=null) c.appendChild(el('small',null, count+'問'));
+        c.addEventListener('click',()=>{ c.classList.toggle('on'); updateCount(); });
+        grid.appendChild(c); return c;
+      }
+
       cp.appendChild(el('div','subhead','分類'));
-      const cg=el('div','chkgrid'); const catCbs=[];
-      cats.forEach(c=>{
-        const cnt=questions.filter(q=>q.category===c).length;
-        const lab=el('label','chk on');
-        const cb=el('input'); cb.type='checkbox'; cb.checked=true; cb.value=c;
-        lab.appendChild(cb); lab.appendChild(el('span',null,escapeHTML(c))); lab.appendChild(el('small',null,cnt+'問'));
-        cb.addEventListener('change',()=>{ lab.classList.toggle('on',cb.checked); updateCount(); });
-        cg.appendChild(lab); catCbs.push(cb);
-      });
+      const cg=el('div','chkgrid'); const catChips=[];
+      cats.forEach(c=>{ const cnt=questions.filter(q=>q.category===c).length; catChips.push(chip(cg, c, c, cnt, true)); });
       cp.appendChild(cg);
 
       cp.appendChild(el('div','subhead','計算の有無'));
       const calcG=el('div','chkgrid');
       const calcN=questions.filter(q=>q.calc).length, nonCalcN=questions.length-calcN;
-      function calcChk(label,cnt){
-        const lab=el('label','chk on');
-        const cb=el('input'); cb.type='checkbox'; cb.checked=true;
-        lab.appendChild(cb); lab.appendChild(el('span',null,label)); lab.appendChild(el('small',null,cnt+'問'));
-        cb.addEventListener('change',()=>{ lab.classList.toggle('on',cb.checked); updateCount(); });
-        calcG.appendChild(lab); return cb;
-      }
-      const calcYesCb=calcChk('計算問題',calcN), calcNoCb=calcChk('計算以外',nonCalcN);
+      const calcYesChip=chip(calcG,'yes','計算問題',calcN,true), calcNoChip=chip(calcG,'no','計算以外',nonCalcN,true);
       cp.appendChild(calcG);
 
       const bar=el('div','chkbar');
       const selAll=el('button','btn sec sm'); selAll.textContent='分類を全選択';
       const selNone=el('button','btn sec sm'); selNone.textContent='分類を全解除';
-      selAll.addEventListener('click',()=>{ catCbs.forEach(cb=>{cb.checked=true; cb.parentNode.classList.add('on');}); updateCount(); });
-      selNone.addEventListener('click',()=>{ catCbs.forEach(cb=>{cb.checked=false; cb.parentNode.classList.remove('on');}); updateCount(); });
+      selAll.addEventListener('click',()=>{ catChips.forEach(c=>c.classList.add('on')); updateCount(); });
+      selNone.addEventListener('click',()=>{ catChips.forEach(c=>c.classList.remove('on')); updateCount(); });
       bar.appendChild(selAll); bar.appendChild(selNone); cp.appendChild(bar);
 
       const startB=el('button','startbtn wide'); startB.style.marginTop='12px'; cp.appendChild(startB);
       const cmsg=el('div','msg'); cp.appendChild(cmsg);
 
       function selected(){
-        const sc=catCbs.filter(cb=>cb.checked).map(cb=>cb.value);
-        const yes=calcYesCb.checked, no=calcNoCb.checked;
+        const sc=catChips.filter(c=>c.classList.contains('on')).map(c=>c.dataset.val);
+        const yes=calcYesChip.classList.contains('on'), no=calcNoChip.classList.contains('on');
         let calc=null; if(yes&&!no)calc='yes'; else if(no&&!yes)calc='no';
         return {categories:sc, calc, yes, no};
       }
