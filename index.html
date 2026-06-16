@@ -57,6 +57,14 @@
   .startbtn.ghost{background:#fff; color:var(--primary); border:1.5px solid var(--primary-soft);}
   .startbtn.wide{grid-column:1/-1; font-size:15px; padding:15px;}
   .startbtn:disabled{opacity:.45; cursor:not-allowed;}
+  .subhead{font-size:12px; font-weight:700; color:var(--muted); margin:14px 0 6px;}
+  .chkgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(138px,1fr)); gap:8px; margin:2px 0;}
+  .chk{display:flex; align-items:center; gap:8px; background:#fff; border:1.5px solid var(--line); border-radius:10px; padding:9px 11px; font-size:13px; font-weight:600; cursor:pointer; min-height:42px;}
+  .chk input{width:17px; height:17px; accent-color:var(--primary); flex:none;}
+  .chk span{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .chk small{font-weight:500; color:var(--muted); margin-left:auto; flex:none;}
+  .chk.on{border-color:var(--primary); background:var(--primary-soft);}
+  .chkbar{display:flex; gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap;}
   .checkrow{display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin-top:12px;}
   .checkrow input{width:16px; height:16px; accent-color:var(--primary);}
   .qhead{display:flex; align-items:center; gap:10px; margin-bottom:12px; font-size:12.5px; color:var(--muted); flex-wrap:wrap;}
@@ -168,6 +176,15 @@
   const INTERVALS = [0,1,7,30,90];           // days by SRS level
   const KMAP = {'ア':0,'イ':1,'ウ':2,'エ':3,'1':0,'2':1,'3':2,'4':3};
   const LETTERS = ['ア','イ','ウ','エ'];
+  // 計算が必要な問題（全問を分析して分類）。data 側で calc を持たない標準問題はこの集合で判定する。
+  const CALC_IDS = new Set([
+    'sc-r3a-am1-q04','sc-r3a-am1-q07','sc-r3a-am1-q21','sc-r3a-am1-q24','sc-r3a-am1-q29',
+    'sc-r4a-am1-q01','sc-r4a-am1-q03','sc-r4a-am1-q04','sc-r4a-am1-q07','sc-r4a-am1-q08','sc-r4a-am1-q18','sc-r4a-am1-q19','sc-r4a-am1-q24',
+    'sc-r5h-am1-q01','sc-r5h-am1-q03','sc-r5h-am1-q04','sc-r5h-am1-q07','sc-r5h-am1-q19',
+    'sc-r6h-am1-q01','sc-r6h-am1-q02','sc-r6h-am1-q03','sc-r6h-am1-q07','sc-r6h-am1-q11','sc-r6h-am1-q13','sc-r6h-am1-q18','sc-r6h-am1-q19','sc-r6h-am1-q29',
+    'sc-r7a-am1-q01','sc-r7a-am1-q03','sc-r7a-am1-q06','sc-r7a-am1-q07','sc-r7a-am1-q10','sc-r7a-am1-q19','sc-r7a-am1-q29'
+  ]);
+  const isCalcQ = (id, raw)=> (raw && typeof raw.calc==='boolean') ? raw.calc : CALC_IDS.has(id);
 
   // ---------- storage (localStorage, with window.storage / memory fallback) ----------
   const MEM = {};
@@ -226,6 +243,9 @@
     if(f.section && q.section!==f.section) return false;
     if(f.year && q.year!==f.year) return false;
     if(f.category && q.category!==f.category) return false;
+    if(f.categories && f.categories.length && f.categories.indexOf(q.category)<0) return false;
+    if(f.calc==='yes' && !q.calc) return false;
+    if(f.calc==='no' && q.calc) return false;
     return true;
   }
   function buildQueue(filter, includeAll){
@@ -293,18 +313,69 @@
       });
       yp.appendChild(g); v.appendChild(yp);
     }
-    // by category
+    // by category (+ calc) — checkbox multi-select
     const cats=[...new Set(questions.map(q=>q.category))].filter(Boolean);
     if(cats.length){
-      const cp=el('div','panel'); cp.appendChild(el('h3',null,'分類別に学習','<small>全問を弱点順で</small>'));
-      const g=el('div','startgrid');
+      const cp=el('div','panel'); cp.appendChild(el('h3',null,'区分を選んで学習','<small>複数選択可・弱点順で出題</small>'));
+
+      cp.appendChild(el('div','subhead','分類'));
+      const cg=el('div','chkgrid'); const catCbs=[];
       cats.forEach(c=>{
         const cnt=questions.filter(q=>q.category===c).length;
-        const b=el('button','startbtn ghost', c+'<small>'+cnt+'問</small>');
-        b.addEventListener('click',()=>startSession({category:c}, true, c));
-        g.appendChild(b);
+        const lab=el('label','chk on');
+        const cb=el('input'); cb.type='checkbox'; cb.checked=true; cb.value=c;
+        lab.appendChild(cb); lab.appendChild(el('span',null,escapeHTML(c))); lab.appendChild(el('small',null,cnt+'問'));
+        cb.addEventListener('change',()=>{ lab.classList.toggle('on',cb.checked); updateCount(); });
+        cg.appendChild(lab); catCbs.push(cb);
       });
-      cp.appendChild(g); v.appendChild(cp);
+      cp.appendChild(cg);
+
+      cp.appendChild(el('div','subhead','計算の有無'));
+      const calcG=el('div','chkgrid');
+      const calcN=questions.filter(q=>q.calc).length, nonCalcN=questions.length-calcN;
+      function calcChk(label,cnt){
+        const lab=el('label','chk on');
+        const cb=el('input'); cb.type='checkbox'; cb.checked=true;
+        lab.appendChild(cb); lab.appendChild(el('span',null,label)); lab.appendChild(el('small',null,cnt+'問'));
+        cb.addEventListener('change',()=>{ lab.classList.toggle('on',cb.checked); updateCount(); });
+        calcG.appendChild(lab); return cb;
+      }
+      const calcYesCb=calcChk('計算問題',calcN), calcNoCb=calcChk('計算以外',nonCalcN);
+      cp.appendChild(calcG);
+
+      const bar=el('div','chkbar');
+      const selAll=el('button','btn sec sm'); selAll.textContent='分類を全選択';
+      const selNone=el('button','btn sec sm'); selNone.textContent='分類を全解除';
+      selAll.addEventListener('click',()=>{ catCbs.forEach(cb=>{cb.checked=true; cb.parentNode.classList.add('on');}); updateCount(); });
+      selNone.addEventListener('click',()=>{ catCbs.forEach(cb=>{cb.checked=false; cb.parentNode.classList.remove('on');}); updateCount(); });
+      bar.appendChild(selAll); bar.appendChild(selNone); cp.appendChild(bar);
+
+      const startB=el('button','startbtn wide'); startB.style.marginTop='12px'; cp.appendChild(startB);
+      const cmsg=el('div','msg'); cp.appendChild(cmsg);
+
+      function selected(){
+        const sc=catCbs.filter(cb=>cb.checked).map(cb=>cb.value);
+        const yes=calcYesCb.checked, no=calcNoCb.checked;
+        let calc=null; if(yes&&!no)calc='yes'; else if(no&&!yes)calc='no';
+        return {categories:sc, calc, yes, no};
+      }
+      function matchCount(f){ return questions.filter(q=>matchFilter(q,{categories:f.categories, calc:f.calc})).length; }
+      function updateCount(){
+        const f=selected();
+        const n=(!f.categories.length || (!f.yes&&!f.no)) ? 0 : matchCount(f);
+        startB.innerHTML='選択した区分で学習<small>'+n+' 問</small>';
+        startB.disabled=(n===0);
+      }
+      startB.addEventListener('click',()=>{
+        const f=selected();
+        if(!f.categories.length){ flash(cmsg,'bad','分類を1つ以上選択してください。'); return; }
+        if(!f.yes&&!f.no){ flash(cmsg,'bad','「計算問題」「計算以外」のいずれかを選択してください。'); return; }
+        const lab=(f.categories.length===cats.length?'全分類':(f.categories.length===1?f.categories[0]:f.categories.length+'分類'))
+          + (f.calc==='yes'?'・計算':f.calc==='no'?'・計算以外':'');
+        startSession({categories:f.categories, calc:f.calc}, true, lab);
+      });
+      updateCount();
+      v.appendChild(cp);
     }
   }
 
@@ -597,7 +668,7 @@
         id, section: raw.section||'午前1', year: raw.year||'', exam: raw.exam||raw.year||'',
         category: raw.category||'未分類', question: raw.question||'',
         choices:(raw.choices||[]).slice(0,4), answer: normAnswer(raw.answer),
-        explanation: raw.explanation||'', hasImage: !!raw.image
+        explanation: raw.explanation||'', hasImage: !!raw.image, calc: isCalcQ(id, raw)
       };
       if(raw.image){ await jset('kakomon:img:'+id, raw.image); imgCache[id]=raw.image; }
       if(id in byId){ questions[byId[id]]=rec; updated++; }
@@ -799,7 +870,7 @@
     questions = await jget('kakomon:questions', []);
     progress = await jget('kakomon:progress', {});
     // ensure shape
-    questions.forEach(q=>{ if(q.hasImage===undefined) q.hasImage=false; });
+    questions.forEach(q=>{ if(q.hasImage===undefined) q.hasImage=false; if(q.calc===undefined) q.calc=isCalcQ(q.id, q); });
 
     // 標準問題を data/ から読み込み（IDを bundledIds に登録しつつ upsert で取り込む）
     try{

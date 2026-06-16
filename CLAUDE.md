@@ -76,7 +76,8 @@ A manifest listing every dataset file the app should fetch and merge on boot:
       "choices": ["...", "...", "...", "..."], // exactly 4 choices (ア/イ/ウ/エ)
       "answer": 1,                    // 0-based index into choices (0=ア,1=イ,2=ウ,3=エ)
       "explanation": "...",           // shown after answering
-      "image": "data:..."             // OPTIONAL: base64 data URL for a question diagram
+      "image": "data:...",            // OPTIONAL: base64 data URL for a question diagram
+      "calc": true                    // OPTIONAL: marks a question as requiring calculation
     }
   ]
 }
@@ -87,6 +88,14 @@ A manifest listing every dataset file the app should fetch and merge on boot:
   files should use 0-based integers** for consistency.
 - `image` (if present) is stored separately in IndexedDB/localStorage
   (`kakomon:img:<id>`) and the in-memory question gets `hasImage: true`.
+- `calc` (boolean, optional) flags whether a question requires calculation
+  ("計算問題"). For the bundled question sets this is **not** stored in the
+  JSON; instead a curated `CALC_IDS` set near the top of the script lists the
+  IDs of calculation questions, and `isCalcQ(id, raw)` resolves the flag
+  (explicit `raw.calc` wins, otherwise membership in `CALC_IDS`, else false).
+  Every in-memory question carries a resolved `q.calc` boolean. When adding a
+  new dataset, classify each question and add the calc IDs to `CALC_IDS`
+  (or set `"calc": true` in the JSON).
 
 ## Key Application Concepts (in `index.html`'s `<script>`)
 
@@ -103,6 +112,12 @@ A manifest listing every dataset file the app should fetch and merge on boot:
   incorrect/"don't know". `groupOf()` buckets each question into
   0=new, 1=due & previously wrong, 2=due for review, 3=not yet due.
   `buildQueue()` ranks/filters questions for a study session.
+- **Session filtering**: `matchFilter(q, f)` supports `section`, `year`,
+  single `category`, a `categories` array (multi-select), and `calc`
+  (`'yes'`=calc only, `'no'`=non-calc only, `null`=both). The home tab's
+  "区分を選んで学習" panel builds a `{categories, calc}` filter from category
+  checkboxes plus 計算問題 / 計算以外 checkboxes and starts a session via
+  `startSession(filter, true, label)`.
 - **Views**: four tabs — ホーム (home/dashboard), 学習 (study/quiz session),
   履歴 (history/log + stats), 問題管理 (manage: sync, import, export, manual
   add, reset). Each has a `render*()` function that rebuilds the view's
