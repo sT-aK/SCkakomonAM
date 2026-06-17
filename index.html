@@ -98,6 +98,8 @@
   .choice:disabled{cursor:default;}
   .dunno{margin-top:11px; width:100%; background:#fff; border:1.5px dashed var(--unk); color:var(--unk); border-radius:11px; padding:11px; font-family:inherit; font-weight:700; font-size:14px; cursor:pointer;}
   .dunno:hover{background:var(--unk-soft);}
+  .skipbtn{margin-top:8px; width:100%; background:none; border:none; color:var(--muted); padding:9px; font-family:inherit; font-weight:600; font-size:13px; cursor:pointer; text-decoration:underline;}
+  .skipbtn:hover{color:var(--ink);}
   .feedback{margin-top:14px; border-radius:12px; padding:14px; font-size:14px;}
   .feedback.ok{background:var(--ok-soft); border:1px solid #bfe6d2;}
   .feedback.ng{background:var(--ng-soft); border:1px solid #f1cccc;}
@@ -501,6 +503,13 @@
     const dun=el('button','dunno','？ 分からない（不正解として記録）');
     dun.addEventListener('click',()=>answer(-1,true));
     card.appendChild(dun);
+    const skip=el('button','skipbtn','スキップ（未回答のまま次へ）');
+    skip.addEventListener('click',()=>{
+      session.ids.shift();
+      if(session.ids.indexOf(q.id)===-1) session.ids.push(q.id);
+      $('#view-study').innerHTML=''; renderStudy();
+    });
+    card.appendChild(skip);
     const fb=el('div'); fb.id='fb'; card.appendChild(fb);
     v.appendChild(card);
 
@@ -542,7 +551,7 @@
   }
 
   // ---------- HISTORY ----------
-  let histMode='log';
+  let histMode='stats';
   function allAttempts(){
     const out=[];
     questions.forEach(q=>{ const p=progress[q.id]; if(p) p.attempts.forEach(a=>out.push({q,a})); });
@@ -593,16 +602,17 @@
     grid.appendChild(el('div','stat unk','<div class="num">'+unk+'</div><div class="lab">「分からない」回数</div>'));
     v.appendChild(grid);
 
-    // recent activity (last 14 days)
+    // recent activity (last 14 days, today first)
     const now=new Date(); const days=[];
-    for(let i=13;i>=0;i--){ const d=new Date(now); d.setHours(0,0,0,0); d.setDate(d.getDate()-i); days.push(d.getTime()); }
+    for(let i=0;i<=13;i++){ const d=new Date(now); d.setHours(0,0,0,0); d.setDate(d.getDate()-i); days.push(d.getTime()); }
     const dayCount={}; atts.forEach(({a})=>{ const d=new Date(a.t); d.setHours(0,0,0,0); const k=d.getTime(); dayCount[k]=(dayCount[k]||0)+1; });
     const maxd=Math.max(1,...days.map(d=>dayCount[d]||0));
+    const WD=['日','月','火','水','木','金','土'];
     const rp=el('div','panel'); rp.appendChild(el('h3',null,'最近14日の学習量'));
     days.forEach(d=>{
       const n=dayCount[d]||0; const dt=new Date(d);
       const row=el('div','secrow');
-      row.appendChild(el('div','secname',(dt.getMonth()+1)+'/'+dt.getDate()));
+      row.appendChild(el('div','secname',(dt.getMonth()+1)+'/'+dt.getDate()+'('+WD[dt.getDay()]+')'));
       const bar=el('div','bar'); const i=el('i',null,''); i.style.width=Math.round(n/maxd*100)+'%'; i.style.background='var(--primary)'; bar.appendChild(i);
       row.appendChild(bar);
       row.appendChild(el('div','barval', n+' 問'));
