@@ -31,6 +31,8 @@
   .logo .dot{color:var(--primary);}
   .persist-note{margin-left:auto; font-size:11.5px; color:var(--muted); background:#fff; border:1px solid var(--line); padding:4px 9px; border-radius:999px;}
   .persist-note.warn{color:var(--due); border-color:var(--due-soft); background:var(--due-soft);}
+  #syncNote{font:inherit; -webkit-appearance:none; appearance:none; cursor:pointer;}
+  #syncNote:active{opacity:.7;}
   .tabs{position:fixed; left:0; right:0; bottom:0; z-index:50; max-width:760px; margin:0 auto; display:flex; gap:6px; background:#efede7; padding:6px max(10px,env(safe-area-inset-left)) calc(6px + env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-right)); border-radius:14px 14px 0 0; box-shadow:0 -3px 16px rgba(20,18,30,.10);}
   .tab{flex:1; text-align:center; padding:11px 4px; border-radius:8px; font-size:13.5px; font-weight:600; color:var(--muted); cursor:pointer; border:none; background:transparent; font-family:inherit; transition:.15s;}
   .tab[aria-selected="true"]{background:#fff; color:var(--ink); box-shadow:var(--shadow);}
@@ -154,7 +156,7 @@
   <div class="topbar">
     <div class="logo">SC 過去問<span class="dot">道場</span> <span style="font-size:11px;font-weight:600;color:var(--muted)">v2</span></div>
     <div id="persistNote" class="persist-note">…</div>
-    <div id="syncNote" class="persist-note">☁ 同期OFF</div>
+    <button id="syncNote" class="persist-note" type="button">☁ 同期OFF</button>
   </div>
   <div class="tabs" role="tablist">
     <button class="tab" role="tab" data-view="home" aria-selected="true">ホーム</button>
@@ -901,6 +903,15 @@
     else if(s==='reauth'){ n.textContent='⚠ 再ログインが必要'; n.className='persist-note warn'; }
     else if(s==='error'){ n.textContent='⚠ 同期エラー'; n.className='persist-note warn'; }
     else { n.textContent='☁ 同期OFF'; n.className='persist-note'; }
+    n.dataset.status=s||'off';
+  }
+  async function onSyncNoteClick(){
+    const n=$('#syncNote'); const s=n ? n.dataset.status : 'off';
+    if(s==='ok'){
+      if(confirm('同期をOFFにしますか？')) await disableSync();
+    } else {
+      await enableSync();
+    }
   }
 
   async function enableSync(){
@@ -937,6 +948,7 @@
     const note=$('#persistNote');
     if(persistent){ note.textContent='✓ 保存有効'; }
     else { note.textContent='⚠ 一時保存（このセッションのみ）'; note.classList.add('warn'); }
+    $('#syncNote').addEventListener('click', onSyncNoteClick);
     questions = await jget('kakomon:questions', []);
     progress = await jget('kakomon:progress', {});
     difficulty = await jget('kakomon:difficulty', {});
