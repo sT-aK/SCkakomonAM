@@ -98,6 +98,8 @@
   .choice:disabled{cursor:default;}
   .dunno{margin-top:11px; width:100%; background:#fff; border:1.5px dashed var(--unk); color:var(--unk); border-radius:11px; padding:11px; font-family:inherit; font-weight:700; font-size:14px; cursor:pointer;}
   .dunno:hover{background:var(--unk-soft);}
+  .skipbtn{margin-top:8px; width:100%; background:none; border:none; color:var(--muted); padding:9px; font-family:inherit; font-weight:600; font-size:13px; cursor:pointer; text-decoration:underline;}
+  .skipbtn:hover{color:var(--ink);}
   .feedback{margin-top:14px; border-radius:12px; padding:14px; font-size:14px;}
   .feedback.ok{background:var(--ok-soft); border:1px solid #bfe6d2;}
   .feedback.ng{background:var(--ng-soft); border:1px solid #f1cccc;}
@@ -501,6 +503,13 @@
     const dun=el('button','dunno','？ 分からない（不正解として記録）');
     dun.addEventListener('click',()=>answer(-1,true));
     card.appendChild(dun);
+    const skip=el('button','skipbtn','スキップ（未回答のまま次へ）');
+    skip.addEventListener('click',()=>{
+      session.ids.shift();
+      if(session.ids.indexOf(q.id)===-1) session.ids.push(q.id);
+      $('#view-study').innerHTML=''; renderStudy();
+    });
+    card.appendChild(skip);
     const fb=el('div'); fb.id='fb'; card.appendChild(fb);
     v.appendChild(card);
 
