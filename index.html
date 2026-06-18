@@ -87,6 +87,7 @@
   .badge.yr{background:#efece6; color:var(--muted);}
   .qcard{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:18px; box-shadow:var(--shadow);}
   .qmeta{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;}
+  .qhist{display:flex; gap:4px; flex-wrap:wrap; margin-bottom:10px; font-size:15px; line-height:1;}
   .qtext{font-size:15.5px; white-space:pre-wrap; margin-bottom:14px;}
   .qimg{width:100%; border:1px solid var(--line); border-radius:10px; margin-bottom:14px; background:#fff;}
   .choices{display:flex; flex-direction:column; gap:9px;}
@@ -487,6 +488,12 @@
     function refreshDiffBadge(){ const d=difficulty[q.id]; diffBadgeSlot.innerHTML=d?'<span class="badge '+DIFF_META[d].cls+'">'+DIFF_META[d].l+'</span>':''; }
     refreshDiffBadge(); meta.appendChild(diffBadgeSlot);
     card.appendChild(meta);
+    const pastAtt=(progress[q.id]||{}).attempts||[];
+    if(pastAtt.length){
+      const hist=el('div','qhist');
+      pastAtt.slice(-10).reverse().forEach(a=>{ hist.appendChild(el('span',null, a.ok?'⭕':'✖')); });
+      card.appendChild(hist);
+    }
     card.appendChild(el('div','qtext', escapeHTML(q.question)));
 
     if(q.hasImage){
