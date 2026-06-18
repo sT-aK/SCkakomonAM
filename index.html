@@ -90,6 +90,7 @@
   .qhist{display:flex; gap:4px; flex-wrap:wrap; margin-bottom:10px; font-size:15px; line-height:1;}
   .qtext{font-size:15.5px; white-space:pre-wrap; margin-bottom:14px;}
   .qimg{width:100%; border:1px solid var(--line); border-radius:10px; margin-bottom:14px; background:#fff;}
+  .qexp{white-space:pre-wrap; font-size:13.5px; color:#2c2b33; margin-bottom:4px;}
   .choices{display:flex; flex-direction:column; gap:9px;}
   .choice{display:flex; align-items:flex-start; gap:11px; text-align:left; background:#fff; border:1.5px solid var(--line); border-radius:11px; padding:12px 13px; font-family:inherit; font-size:14.5px; cursor:pointer; transition:.12s; width:100%; color:var(--ink);}
   .choice:hover{border-color:var(--primary-soft); background:#fcfcff;}
@@ -116,7 +117,6 @@
   .btn.sm{padding:7px 12px; font-size:12.5px;}
   textarea,input,select{font-family:inherit; font-size:14px; width:100%; border:1.5px solid var(--line); border-radius:10px; padding:10px 12px; background:#fff; color:var(--ink);}
   textarea{min-height:120px; resize:vertical;}
-  label.fld{display:block; font-size:12.5px; font-weight:700; color:var(--muted); margin:12px 0 5px;}
   .msg{font-size:13px; padding:10px 12px; border-radius:10px; margin-top:10px; display:none;}
   .msg.show{display:block;}
   .msg.good{background:var(--ok-soft); color:#16704d;}
@@ -652,6 +652,8 @@
   }
 
   // ---------- MANAGE ----------
+  let manageOpenId=null;  // 詳細表示中の問題ID（登録済み一覧）
+  let manageQuery='';     // 登録済み一覧の検索キーワード
   function renderManage(){
     const v=$('#view-manage'); v.innerHTML='';
     // Google同期パネル
@@ -666,38 +668,8 @@
     ghelp.textContent= syncEnabled ? '同期中。解答するたび自動で保存されます。' : 'ログインすると他の端末と学習履歴を共有できます。';
     gp.appendChild(ghelp);
     v.appendChild(gp);
-    // import
-    const ip=el('div','panel'); ip.appendChild(el('h3',null,'インポート','<small>同じIDは上書き（重複しません）</small>'));
-    const fileRow=el('div','row'); fileRow.style.cssText='display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px';
-    const fileBtn=el('label','btn sec sm'); fileBtn.textContent='ファイルを選択';
-    const file=el('input'); file.type='file'; file.accept='.json,application/json'; file.style.display='none';
-    fileBtn.appendChild(file); fileRow.appendChild(fileBtn);
-    const fileName=el('span','mini','未選択'); fileRow.appendChild(fileName);
-    ip.appendChild(fileRow);
-    const ta=el('textarea'); ta.placeholder='ここに JSON を貼り付けても取り込めます…'; ip.appendChild(ta);
-    const imp=el('button','btn'); imp.textContent='取り込む'; imp.style.marginTop='10px'; ip.appendChild(imp);
-    const imsg=el('div','msg'); ip.appendChild(imsg);
-    let fileText='';
-    file.addEventListener('change',()=>{
-      const f=file.files[0]; if(!f)return; fileName.textContent=f.name;
-      const r=new FileReader(); r.onload=()=>{fileText=r.result;}; r.readAsText(f);
-    });
-    imp.addEventListener('click',async()=>{
-      const txt=(ta.value.trim()||fileText||'').trim();
-      if(!txt){ flash(imsg,'bad','JSON を貼り付けるかファイルを選択してください。'); return; }
-      try{
-        const data=JSON.parse(txt);
-        const arr=Array.isArray(data)?data:(data.questions||[]);
-        if(!arr.length){ flash(imsg,'bad','questions が見つかりません。'); return; }
-        const res=await upsert(arr);
-        flash(imsg,'good','取り込み完了：新規 '+res.added+' 問・更新 '+res.updated+' 問（合計 '+questions.length+' 問）');
-        ta.value=''; fileText=''; fileName.textContent='未選択';
-        renderManage();
-      }catch(e){ flash(imsg,'bad','JSON の解析に失敗しました：'+e.message); }
-    });
-    v.appendChild(ip);
 
-    // current data summary + export/reset
+    // current data summary + export/reset + browse
     const sp=el('div','panel'); sp.appendChild(el('h3',null,'登録済みの問題','<small>'+questions.length+' 問</small>'));
     const byYear={}; questions.forEach(q=>{byYear[q.year||'—']=(byYear[q.year||'—']||0)+1;});
     Object.keys(byYear).forEach(y=>{
@@ -713,32 +685,84 @@
     rs.addEventListener('click',resetAll); actions.appendChild(rs);
     sp.appendChild(actions);
     const smsg=el('div','msg'); smsg.id='smsg'; sp.appendChild(smsg);
-    v.appendChild(sp);
 
-    // manual add
-    const ap=el('div','panel'); ap.appendChild(el('h3',null,'問題を手動で追加'));
-    ap.appendChild(fld('年度（例：R6春）','m_year'));
-    ap.appendChild(fld('分類（例：セキュリティ）','m_cat'));
-    ap.appendChild(fldArea('問題文','m_q'));
-    for(let i=0;i<4;i++) ap.appendChild(fld('選択肢 '+LETTERS[i],'m_c'+i));
-    const al=el('label','fld'); al.textContent='正解'; ap.appendChild(al);
-    const sel=el('select'); sel.id='m_ans'; LETTERS.forEach((L,i)=>{const o=el('option',null,L);o.value=i;sel.appendChild(o);}); ap.appendChild(sel);
-    ap.appendChild(fldArea('解説','m_exp'));
-    const add=el('button','btn'); add.textContent='追加する'; add.style.marginTop='12px'; ap.appendChild(add);
-    const amsg=el('div','msg'); ap.appendChild(amsg);
-    add.addEventListener('click',async()=>{
-      const q=$('#m_q').value.trim(); const cs=[0,1,2,3].map(i=>$('#m_c'+i).value.trim());
-      if(!q||cs.some(c=>!c)){ flash(amsg,'bad','問題文と4つの選択肢は必須です。'); return; }
-      const rec={id:'man-'+Date.now(), section:'午前1', year:$('#m_year').value.trim()||'手動', exam:($('#m_year').value.trim()||'手動')+' 問', category:$('#m_cat').value.trim()||'未分類', question:q, choices:cs, answer:parseInt($('#m_ans').value,10), explanation:$('#m_exp').value.trim()};
-      await upsert([rec]);
-      flash(amsg,'good','追加しました（合計 '+questions.length+' 問）');
-      ['m_q','m_c0','m_c1','m_c2','m_c3','m_exp'].forEach(id=>$('#'+id).value='');
-      renderManage();
-    });
-    v.appendChild(ap);
+    sp.appendChild(el('div','subhead','問題を見る'));
+    if(manageOpenId && !questions.some(q=>q.id===manageOpenId)) manageOpenId=null;
+    if(manageOpenId) renderQuestionDetail(sp, manageOpenId);
+    else renderQuestionList(sp);
+    v.appendChild(sp);
   }
-  function fld(label,id){ const w=el('div'); const l=el('label','fld',label); const i=el('input'); i.id=id; w.appendChild(l); w.appendChild(i); return w; }
-  function fldArea(label,id){ const w=el('div'); const l=el('label','fld',label); const t=el('textarea'); t.id=id; t.style.minHeight='80px'; w.appendChild(l); w.appendChild(t); return w; }
+  function renderQuestionList(v){
+    const search=el('input'); search.type='text'; search.placeholder='分類・年度・問題文で検索…';
+    search.value=manageQuery; search.style.marginBottom='10px';
+    v.appendChild(search);
+    const list=el('div','loglist'); v.appendChild(list);
+    function draw(){
+      list.innerHTML='';
+      const kw=manageQuery.trim().toLowerCase();
+      const filtered=questions.filter(q=> !kw || ((q.category||'')+(q.year||'')+(q.exam||'')+(q.question||'')).toLowerCase().includes(kw));
+      if(!filtered.length){ list.appendChild(el('div','mini','該当する問題がありません。')); return; }
+      filtered.forEach(q=>{
+        const p=progress[q.id]; const atts=p?p.attempts:[]; const last=atts.length?atts[atts.length-1]:null;
+        const res=last?(last.ok?'ok':'ng'):'unk';
+        const row=el('div','logitem'); row.style.cursor='pointer';
+        row.appendChild(el('span','logdot '+res,''));
+        const m=el('div','logmain');
+        m.appendChild(el('div','l1',(q.exam||q.year||'')+(q.category?'　'+q.category:'')));
+        m.appendChild(el('div','l2',escapeHTML(q.question.slice(0,40))+(q.question.length>40?'…':'')));
+        row.appendChild(m);
+        const correctN=atts.filter(a=>a.ok).length;
+        row.appendChild(el('span','logres '+res, atts.length? (correctN+'/'+atts.length+' 正解') : '未回答'));
+        row.addEventListener('click',()=>{ manageOpenId=q.id; renderManage(); });
+        list.appendChild(row);
+      });
+    }
+    draw();
+    search.addEventListener('input',()=>{ manageQuery=search.value; draw(); });
+  }
+  function renderQuestionDetail(v, id){
+    const q=questions.find(x=>x.id===id);
+    const back=el('button','btn sec sm','← 一覧へ戻る'); back.style.marginBottom='10px';
+    back.addEventListener('click',()=>{ manageOpenId=null; renderManage(); });
+    v.appendChild(back);
+
+    const meta=el('div','qmeta');
+    if(q.category) meta.appendChild(el('span','badge cat',q.category));
+    meta.appendChild(el('span','badge yr',(q.exam||q.year||'')));
+    const d=difficulty[q.id]; if(d) meta.appendChild(el('span','badge '+DIFF_META[d].cls, DIFF_META[d].l));
+    v.appendChild(meta);
+
+    v.appendChild(el('div','qtext', escapeHTML(q.question)));
+
+    const ch=el('div','choices');
+    q.choices.forEach((c,i)=>{
+      const b=el('div','choice'+(i===q.answer?' correct':'')); b.style.cursor='default';
+      b.appendChild(el('span','k',LETTERS[i]));
+      b.appendChild(el('span',null,escapeHTML(c)));
+      ch.appendChild(b);
+    });
+    v.appendChild(ch);
+
+    if(q.explanation){
+      v.appendChild(el('div','subhead','解説'));
+      v.appendChild(el('div','qexp', escapeHTML(q.explanation)));
+    }
+
+    v.appendChild(el('div','subhead','学習履歴'));
+    const p=progress[q.id]; const atts=p?p.attempts.slice().reverse():[];
+    if(!atts.length){ v.appendChild(el('div','mini','まだ解答していません。')); return; }
+    const hl=el('div','loglist');
+    atts.forEach(a=>{
+      const res=a.unknown?'unk':(a.ok?'ok':'ng');
+      const label=a.unknown?'分からない':(a.ok?'正解':'不正解');
+      const row=el('div','logitem');
+      row.appendChild(el('span','logdot '+res,''));
+      row.appendChild(el('div','logmain','<div class="l1">'+fmtDT(a.t)+'</div>'));
+      row.appendChild(el('span','logres '+res,label));
+      hl.appendChild(row);
+    });
+    v.appendChild(hl);
+  }
 
   function normAnswer(a){
     if(typeof a==='number') return (a>=0&&a<=3) ? a : (a>=1&&a<=4 ? a-1 : 0);
