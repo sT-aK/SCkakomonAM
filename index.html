@@ -367,17 +367,26 @@
         c.addEventListener('click',()=>{ c.classList.toggle('on'); updateCount(); });
         grid.appendChild(c); return c;
       }
+      function selBar(chips){
+        const bar=el('div','chkbar');
+        const a=el('button','btn sec sm','全て選択'); const n=el('button','btn sec sm','全て解除');
+        a.addEventListener('click',()=>{ chips.forEach(c=>c.classList.add('on')); updateCount(); });
+        n.addEventListener('click',()=>{ chips.forEach(c=>c.classList.remove('on')); updateCount(); });
+        bar.appendChild(a); bar.appendChild(n); return bar;
+      }
 
       cp.appendChild(el('div','subhead','分類'));
       const cg=el('div','chkgrid'); const catChips=[];
       cats.forEach(c=>{ const cnt=questions.filter(q=>q.category===c).length; catChips.push(chip(cg, c, c, cnt, true)); });
       cp.appendChild(cg);
+      cp.appendChild(selBar(catChips));
 
       cp.appendChild(el('div','subhead','計算の有無'));
       const calcG=el('div','chkgrid');
       const calcN=questions.filter(q=>q.calc).length, nonCalcN=questions.length-calcN;
       const calcYesChip=chip(calcG,'yes','計算問題',calcN,true), calcNoChip=chip(calcG,'no','計算以外',nonCalcN,true);
       cp.appendChild(calcG);
+      cp.appendChild(selBar([calcYesChip, calcNoChip]));
 
       cp.appendChild(el('div','subhead','難易度'));
       const diffG=el('div','chkgrid'); diffG.style.gridTemplateColumns='repeat(2,1fr)';
@@ -387,13 +396,7 @@
         diffChips[v]=chip(diffG, v, lbl, cnt, true);
       });
       cp.appendChild(diffG);
-
-      const bar=el('div','chkbar');
-      const selAll=el('button','btn sec sm'); selAll.textContent='分類を全選択';
-      const selNone=el('button','btn sec sm'); selNone.textContent='分類を全解除';
-      selAll.addEventListener('click',()=>{ catChips.forEach(c=>c.classList.add('on')); updateCount(); });
-      selNone.addEventListener('click',()=>{ catChips.forEach(c=>c.classList.remove('on')); updateCount(); });
-      bar.appendChild(selAll); bar.appendChild(selNone); cp.appendChild(bar);
+      cp.appendChild(selBar(Object.values(diffChips)));
 
       const startB=el('button','startbtn wide'); startB.style.marginTop='12px'; cp.appendChild(startB);
       const cmsg=el('div','msg'); cp.appendChild(cmsg);
