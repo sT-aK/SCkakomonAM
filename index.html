@@ -327,11 +327,11 @@
   // ---------- SCORE ----------
   // 採点ルール:
   //  ・1問ごと: 正解 +1 / 不正解(「分からない」含む) -1 / 解答すれば(正誤問わず) +0.1
-  //  ・1日の問題数ボーナス: 10問で +1、20問で +2（段階制・上限+2）
+  //  ・1日の問題数ボーナス: 10問ごとに +1（10問+1・20問+2・30問+3…上限なし）
   //  ・上記のプラス点(正解+1・+0.1・問数ボーナス)には連続日数の複利倍率 1.1^(連続日数-1) をかける
   //    （マイナスの -1 には倍率をかけない）。スコアは attempts のログから毎回導出する。
   function dayMs(t){ const d=new Date(t); d.setHours(0,0,0,0); return d.getTime(); }
-  function volBonus(n){ return n>=20 ? 2 : n>=10 ? 1 : 0; }
+  function volBonus(n){ return Math.floor(n/10); }   // 10問ごとに +1（上限なし）
   function computeScore(){
     const days={};                                   // 0時ms -> {answered, correct}
     Object.values(progress).forEach(p=>p.attempts.forEach(a=>{
@@ -381,7 +381,7 @@
       +'<div class="score-row"><span class="k">連続</span><span class="vv">'+sc.todayStreak+'日'+(sc.todayStreak>1?' ×'+mult.toFixed(2):'')+'</span></div>'
       +'</div>';
     v.appendChild(hero);
-    v.appendChild(el('div','score-note','正解 +1 ／ 不正解 −1 ／ 解答するだけで +0.1。1日10問で +1・20問で +2。連続日数でプラス点が複利（×1.1／日）。'));
+    v.appendChild(el('div','score-note','正解 +1 ／ 不正解 −1 ／ 解答するだけで +0.1。1日10問ごとに +1（20問で+2・30問で+3…）。連続日数でプラス点が複利（×1.1／日）。'));
 
     const grid=el('div','grid');
     grid.appendChild(el('div','stat new','<div class="num">'+nNew+'</div><div class="lab">未回答</div>'));
