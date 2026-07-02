@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#4338ca">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -18,6 +18,10 @@
     --radius:16px; --blur:blur(14px);
     --jp:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic","Meiryo","Noto Sans JP",system-ui,sans-serif;
   }
+  /* 外側(html/body)もテーマ色にする: 余白・オーバースクロール・Safariのバー色が白くならないように */
+  html,body{margin:0; padding:0;}
+  html{background:linear-gradient(160deg,#0ea5a3 0%,#3b82f6 55%,#8b5cf6 100%) fixed; background-color:#3b82f6;}
+  html.night{background:linear-gradient(160deg,#0b1120 0%,#1e1b4b 55%,#3b0764 100%) fixed; background-color:#14122d;}
   /* 昼テーマ「オーロラ」（6〜17時） */
   #app-root{
     --bg-grad:linear-gradient(160deg,#0ea5a3 0%,#3b82f6 55%,#8b5cf6 100%);
@@ -250,6 +254,7 @@
   function applyTheme(){
     const h=new Date().getHours(); const night=(h<6||h>=18);
     root.classList.toggle('night', night);
+    document.documentElement.classList.toggle('night', night);
     const m=document.querySelector('meta[name="theme-color"]');
     if(m) m.setAttribute('content', night?'#0b1120':'#0ea5a3');
   }
