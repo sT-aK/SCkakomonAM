@@ -61,7 +61,18 @@
   .secname{font-weight:700; min-width:84px; flex:none; font-size:13px;}
   .bar{flex:1; height:9px; background:#eeece6; border-radius:99px; overflow:hidden;}
   .bar>i{display:block; height:100%; background:var(--ok); border-radius:99px;}
+  .bar.stack{display:flex;}
+  .bar.stack>i{border-radius:0; flex:none;}
+  .bar.stack>i.ok{background:var(--ok);} .bar.stack>i.unk{background:var(--unk);} .bar.stack>i.ng{background:var(--ng);}
   .barval{width:104px; flex:none; text-align:right; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums;}
+  .histlegend{display:flex; gap:14px; flex-wrap:wrap; font-size:11.5px; color:var(--muted); margin:6px 2px 2px;}
+  .histlegend .dot{display:inline-block; width:8px; height:8px; border-radius:99px; margin-right:5px;}
+  .secrow.click{cursor:pointer;}
+  .secrow.click:hover .secname{color:var(--primary);}
+  .secrow .arw{flex:none; font-size:10px; color:var(--muted); width:12px;}
+  .daylist{margin:2px 0 6px; padding:2px 11px; background:#faf9f6; border:1px solid var(--line); border-radius:10px;}
+  .daylist .logitem{cursor:pointer;}
+  .daylist .logitem:hover .l1{color:var(--primary);}
   .startgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:10px; margin-top:4px;}
   .startbtn{background:var(--primary); color:#fff; border:none; border-radius:12px; padding:13px 8px; font-family:inherit; font-weight:700; font-size:14px; cursor:pointer; transition:.15s; box-shadow:var(--shadow); text-align:center;}
   .startbtn:hover{filter:brightness(1.06);}
@@ -104,10 +115,15 @@
   .choices{display:flex; flex-direction:column; gap:9px;}
   .choice{display:flex; align-items:flex-start; gap:11px; text-align:left; background:#fff; border:1.5px solid var(--line); border-radius:11px; padding:12px 13px; font-family:inherit; font-size:14.5px; cursor:pointer; transition:.12s; width:100%; color:var(--ink);}
   .choice:hover{border-color:var(--primary-soft); background:#fcfcff;}
-  .choice .k{flex:none; width:25px; height:25px; border-radius:7px; background:#efede7; color:var(--muted); font-weight:800; font-size:13px; display:flex; align-items:center; justify-content:center;}
+  .choice .k{flex:none; width:34px; height:34px; border-radius:9px; background:var(--primary-soft); color:var(--primary); font-weight:800; font-size:14px; display:flex; align-items:center; justify-content:center;}
+  button.choice .k{cursor:pointer;}
   .choice.correct{border-color:var(--ok); background:var(--ok-soft);} .choice.correct .k{background:var(--ok); color:#fff;}
   .choice.wrong{border-color:var(--ng); background:var(--ng-soft);} .choice.wrong .k{background:var(--ng); color:#fff;}
+  .choice.eliminated{opacity:.42;}
+  .choice.eliminated .txt{text-decoration:line-through;}
+  .choice.correct.eliminated,.choice.wrong.eliminated{opacity:1;}
   .choice:disabled{cursor:default;}
+  .elimhint{font-size:11.5px; color:var(--muted); margin-top:8px; line-height:1.5;}
   .dunno{margin-top:11px; width:100%; background:#fff; border:1.5px dashed var(--unk); color:var(--unk); border-radius:11px; padding:11px; font-family:inherit; font-weight:700; font-size:14px; cursor:pointer;}
   .dunno:hover{background:var(--unk-soft);}
   .skipbtn{margin-top:8px; width:100%; background:none; border:none; color:var(--muted); padding:9px; font-family:inherit; font-weight:600; font-size:13px; cursor:pointer; text-decoration:underline;}
@@ -502,6 +518,10 @@
     session={ids:ids.slice(), total:ids.length, done:new Set(), seen:new Set(), label:label||'おすすめ'};
     show('study');
   }
+  function replayQuestion(id){ // 履歴から1問だけ解き直す（回答は通常どおり記録・不正解でも再出題しない）
+    session={ids:[id], total:1, done:new Set(), seen:new Set(), label:'解き直し', single:true};
+    show('study');
+  }
   function renderStudy(){
     const v=$('#view-study'); v.innerHTML='';
     if(!session){
@@ -532,6 +552,7 @@
     head.appendChild(el('span',null,session.label));
     const endBtn=el('button','btn sec sm','終了'); endBtn.style.flex='none';
     endBtn.addEventListener('click',()=>{
+      if(session.single){ session=null; show('hist'); return; }
       if(confirm('学習を終了しますか？\nここまでの回答は記録されています。')){ session=null; show('home'); }
     });
     head.appendChild(endBtn);
@@ -562,21 +583,31 @@
     q.choices.forEach((c,i)=>{
       const b=el('button','choice');
       b.appendChild(el('span','k',LETTERS[i]));
-      b.appendChild(el('span',null,escapeHTML(c)));
-      b.addEventListener('click',()=>answer(i,false));
+      b.appendChild(el('span','txt',escapeHTML(c)));
+      // 消去法: 文をタップでグレーアウト（消去）、番号(ア〜エ)をタップしたときだけ回答判定。
+      // 消去済みの選択肢はどこをタップしても復元のみ（誤答防止）。
+      b.addEventListener('click',e=>{
+        if(b.disabled) return;
+        if(b.classList.contains('eliminated')){ b.classList.remove('eliminated'); return; }
+        if(e.target.closest('.k')) answer(i,false);
+        else b.classList.add('eliminated');
+      });
       ch.appendChild(b); btns.push(b);
     });
     card.appendChild(ch);
+    card.appendChild(el('div','elimhint','文をタップ＝消去（もう一度タップで戻す）／ 番号（ア〜エ）をタップ＝回答'));
     const dun=el('button','dunno','？ 分からない（不正解として記録）');
     dun.addEventListener('click',()=>answer(-1,true));
     card.appendChild(dun);
-    const skip=el('button','skipbtn','スキップ（未回答のまま次へ）');
-    skip.addEventListener('click',()=>{
-      session.ids.shift();
-      if(session.ids.indexOf(q.id)===-1) session.ids.push(q.id);
-      $('#view-study').innerHTML=''; renderStudy();
-    });
-    card.appendChild(skip);
+    if(!session.single){
+      const skip=el('button','skipbtn','スキップ（未回答のまま次へ）');
+      skip.addEventListener('click',()=>{
+        session.ids.shift();
+        if(session.ids.indexOf(q.id)===-1) session.ids.push(q.id);
+        $('#view-study').innerHTML=''; renderStudy();
+      });
+      card.appendChild(skip);
+    }
     const fb=el('div'); fb.id='fb'; card.appendChild(fb);
     v.appendChild(card);
 
@@ -589,7 +620,7 @@
       session.ids.shift();
       session.seen.add(q.id);
       if(ok){ session.done.add(q.id); }
-      else { if(session.ids.indexOf(q.id)===-1) session.ids.push(q.id); } // re-queue at end
+      else if(!session.single){ if(session.ids.indexOf(q.id)===-1) session.ids.push(q.id); } // re-queue at end（1問解き直しは再出題しない）
       const fbx=el('div','feedback '+(ok?'ok':'ng'));
       const title = ok?'正解':(unknown?'分からない（不正解）':'不正解');
       fbx.appendChild(el('div','ftitle',(ok?'✓ ':'✕ ')+title+'　<span style="font-weight:600;font-size:12px;color:var(--muted)">正解：'+LETTERS[q.answer]+'</span>'));
@@ -610,8 +641,8 @@
       });
       updateDiffBtns();
       fb.appendChild(dr);
-      const nb=el('button','nextbtn', session.ids.length? '次の問題へ' : '結果を見る');
-      nb.addEventListener('click',()=>{ $('#view-study').innerHTML=''; renderStudy(); });
+      const nb=el('button','nextbtn', session.single? '履歴に戻る' : (session.ids.length? '次の問題へ' : '結果を見る'));
+      nb.addEventListener('click',()=>{ if(session&&session.single){ session=null; show('hist'); return; } $('#view-study').innerHTML=''; renderStudy(); });
       fb.appendChild(nb);
       nb.scrollIntoView({behavior:'smooth',block:'nearest'});
     }
@@ -619,6 +650,8 @@
 
   // ---------- HISTORY ----------
   let histMode='stats';
+  let histPeriod=14, histOpenDay=null; // 学習量の表示期間（日数）と展開中の日付(0時ms)
+  const HIST_PERIODS=[[14,'14日'],[30,'1ヶ月'],[90,'3ヶ月'],[180,'6ヶ月'],[365,'1年']];
   function allAttempts(){
     const out=[];
     questions.forEach(q=>{ const p=progress[q.id]; if(p) p.attempts.forEach(a=>out.push({q,a})); });
@@ -669,21 +702,62 @@
     grid.appendChild(el('div','stat unk','<div class="num">'+unk+'</div><div class="lab">「分からない」回数</div>'));
     v.appendChild(grid);
 
-    // recent activity (last 14 days, today first)
-    const now=new Date(); const days=[];
-    for(let i=0;i<=13;i++){ const d=new Date(now); d.setHours(0,0,0,0); d.setDate(d.getDate()-i); days.push(d.getTime()); }
-    const dayCount={}; atts.forEach(({a})=>{ const d=new Date(a.t); d.setHours(0,0,0,0); const k=d.getTime(); dayCount[k]=(dayCount[k]||0)+1; });
-    const maxd=Math.max(1,...days.map(d=>dayCount[d]||0));
+    // 学習量: 期間切替（14日〜1年）・正誤内訳の積み上げバー・日付タップで当日の問題一覧→解き直し
+    const rp=el('div','panel'); rp.appendChild(el('h3',null,'学習量'));
+    const pseg=el('div','seg'); pseg.style.marginBottom='4px';
+    HIST_PERIODS.forEach(([d,lab])=>{
+      const b=el('button',null,lab); b.setAttribute('aria-pressed', histPeriod===d);
+      b.addEventListener('click',()=>{histPeriod=d; histOpenDay=null; renderHist();});
+      pseg.appendChild(b);
+    });
+    rp.appendChild(pseg);
+    const lg=el('div','histlegend');
+    [['var(--ok)','正解'],['var(--unk)','分からない'],['var(--ng)','不正解']].forEach(([c,lab])=>{
+      lg.appendChild(el('span',null,'<span class="dot" style="background:'+c+'"></span>'+lab));
+    });
+    rp.appendChild(lg);
+
+    const dayStat={}; // 0時ms -> {ok,unk,ng,items:[{q,a}]}
+    atts.forEach(it=>{
+      const k=dayMs(it.a.t); let s=dayStat[k]||(dayStat[k]={ok:0,unk:0,ng:0,items:[]});
+      if(it.a.unknown)s.unk++; else if(it.a.ok)s.ok++; else s.ng++; s.items.push(it);
+    });
+    const todayK=dayMs(Date.now()); const fromK=todayK-(histPeriod-1)*DAY;
+    let days=[];
+    if(histPeriod<=30){ for(let k=todayK;k>=fromK;k-=DAY) days.push(k); }                 // 0問の日も表示
+    else { days=Object.keys(dayStat).map(Number).filter(k=>k>=fromK).sort((a,b)=>b-a); }   // 学習した日だけ
+    const maxd=Math.max(1,...days.map(k=>{const s=dayStat[k]; return s?s.ok+s.unk+s.ng:0;}));
     const WD=['日','月','火','水','木','金','土'];
-    const rp=el('div','panel'); rp.appendChild(el('h3',null,'最近14日の学習量'));
-    days.forEach(d=>{
-      const n=dayCount[d]||0; const dt=new Date(d);
-      const row=el('div','secrow');
-      row.appendChild(el('div','secname',(dt.getMonth()+1)+'/'+dt.getDate()+'('+WD[dt.getDay()]+')'));
-      const bar=el('div','bar'); const i=el('i',null,''); i.style.width=Math.round(n/maxd*100)+'%'; i.style.background='var(--primary)'; bar.appendChild(i);
+    const cy=new Date().getFullYear();
+    if(!days.length) rp.appendChild(el('div','mini','この期間の学習履歴はありません。'));
+    days.forEach(k=>{
+      const s=dayStat[k]; const n=s?s.ok+s.unk+s.ng:0; const dt=new Date(k);
+      const open = histOpenDay===k;
+      const row=el('div','secrow'+(n?' click':''));
+      row.appendChild(el('span','arw', n?(open?'▼':'▶'):''));
+      row.appendChild(el('div','secname',(dt.getFullYear()!==cy?dt.getFullYear()+'/':'')+(dt.getMonth()+1)+'/'+dt.getDate()+'('+WD[dt.getDay()]+')'));
+      const bar=el('div','bar stack');
+      if(s){ [['ok',s.ok],['unk',s.unk],['ng',s.ng]].forEach(([cls,c])=>{ if(c){const i=el('i',cls,''); i.style.width=(c/maxd*100)+'%'; bar.appendChild(i);} }); }
       row.appendChild(bar);
       row.appendChild(el('div','barval', n+' 問'));
+      if(n) row.addEventListener('click',()=>{ histOpenDay=open?null:k; renderHist(); });
       rp.appendChild(row);
+      if(open&&s){
+        const dl=el('div','daylist');
+        s.items.forEach(({q,a})=>{
+          const res=a.unknown?'unk':(a.ok?'ok':'ng');
+          const r2=el('div','logitem');
+          r2.appendChild(el('span','logdot '+res,''));
+          const m=el('div','logmain');
+          m.appendChild(el('div','l1',(q.exam||q.year||'')+(q.category?'　'+q.category:'')));
+          m.appendChild(el('div','l2',fmtDT(a.t)+'　タップで解き直し'));
+          r2.appendChild(m);
+          r2.appendChild(el('span','logres '+res, a.unknown?'分からない':(a.ok?'正解':'不正解')));
+          r2.addEventListener('click',()=>replayQuestion(q.id));
+          dl.appendChild(r2);
+        });
+        rp.appendChild(dl);
+      }
     });
     v.appendChild(rp);
 
