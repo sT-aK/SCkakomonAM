@@ -104,14 +104,25 @@ A manifest listing every dataset file the app should fetch and merge on boot:
   these helpers rather than calling `localStorage` directly, so the app keeps
   working when storage is unavailable (e.g. private browsing).
 - **State**: `questions` (array, merged bundled + custom), `progress` (map of
-  question id → `{attempts:[{t,ok,unknown}], level, due}`), `bundledIds`
+  question id → `{attempts:[{t,ok,unknown}], ivl, ef, due, lapses, streak,
+  level}` — everything except `attempts` is derived), `bundledIds`
   (Set of IDs that came from `data/*.json`, used to exclude them from sync
   payloads and exports-as-custom).
-- **SRS scheduler**: `INTERVALS = [0,1,7,30,90]` days. `record()` advances
-  `level`/`due` on correct answers and resets to level 0 (+1 day) on
-  incorrect/"don't know". `groupOf()` buckets each question into
-  0=new, 1=due & previously wrong, 2=due for review, 3=not yet due.
-  `buildQueue()` ranks/filters questions for a study session.
+- **SRS scheduler (forgetting-curve based)**: `sched(attempts)` is a pure
+  function that folds the attempt log into `{ivl, ef, due, lapses, streak,
+  level}`. Correct answers grow the interval 1d → 3d → ×`ef` (per-item ease
+  1.3–2.8, +0.03 on success, −0.2 on wrong / −0.15 on "don't know"), capped at
+  180d, with a +15% bonus when answered correctly well past due. Failure keeps
+  40% of the interval (fast relearning) and schedules review for the next day.
+  `sched()` is the single source of truth: `record()`, the sync merge
+  (`mergeProgress`) and the boot-time migration all call it, so legacy
+  `{level,due}`-only data upgrades automatically. `retention(p, now)` returns
+  the predicted recall probability `R = exp(-elapsedDays/ivl)`. `groupOf()`
+  buckets each question into 0=new, 1=due & previously wrong, 2=due for
+  review, 3=not yet due (used for home-tab stats). `buildQueue()` orders a
+  session: due items first sorted by `(1-R)` plus a lapse ("leech") bonus and
+  a manual-difficulty nudge, then new items (weakest category first), then —
+  only when `includeAll` — not-yet-due items by ascending `R`.
 - **Session filtering**: `matchFilter(q, f)` supports `section`, `year`,
   single `category`, a `categories` array (multi-select), and `calc`
   (`'yes'`=calc only, `'no'`=non-calc only, `null`=both). The home tab's

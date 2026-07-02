@@ -262,7 +262,7 @@
   const $ = s => root.querySelector(s);
   const el = (t,c,h)=>{const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e;};
   const DAY = 86400000;
-  const INTERVALS = [0,1,7,30,90];           // days by SRS level
+  // 旧固定間隔 [0,1,7,30,90] は sched() による適応型スケジューラに置き換え
   const KMAP = {'ア':0,'イ':1,'ウ':2,'エ':3,'1':0,'2':1,'3':2,'4':3};
   const LETTERS = ['ア','イ','ウ','エ'];
   // 計算が必要な問題（全問を分析して分類）。data 側で calc を持たない標準問題はこの集合で判定する。
@@ -316,17 +316,46 @@
     if(typeof schedulePush==='function') schedulePush();
   }
 
-  // ---------- SRS ----------
+  // ---------- SRS（忘却曲線ベースの適応型スケジューラ） ----------
+  // 解答履歴だけから状態を決める純関数。record・同期マージ・起動時移行で共用。
+  //  ivl: 復習間隔(日)＝記憶の安定度の推定値 / ef: 項目ごとの覚えやすさ(1.3〜2.8)
+  //  正解: 1日→3日→×ef と延長。期限を大きく過ぎてなお正解＝記憶が強い(+15%)
+  //  不正解: 完全リセットせず間隔を4割残す（再学習は初学より速い）。ef を減らして
+  //  その項目の以後の延び方を抑える。「分からない」は誤答よりefの減りを軽く。
+  function sched(attempts){
+    let ef=2.3, ivl=0, due=0, lapses=0, streak=0;
+    (attempts||[]).forEach(a=>{
+      if(a.ok){
+        const late = due>0 && a.t>due+ivl*DAY*0.5;
+        if(ivl<1) ivl=1;
+        else if(ivl<3) ivl=3;
+        else ivl=Math.min(180, Math.round(ivl*ef*(late?1.15:1)));
+        ef=Math.min(2.8, ef+0.03); streak++;
+        due=a.t+ivl*DAY;
+      } else {
+        ef=Math.max(1.3, ef-(a.unknown?0.15:0.2));
+        ivl=Math.max(1, Math.round(ivl*0.4));
+        lapses++; streak=0;
+        due=a.t+DAY;
+      }
+    });
+    const level = ivl<1?0 : ivl<3?1 : ivl<10?2 : ivl<40?3 : 4; // 旧level互換
+    return {ivl, ef:Math.round(ef*100)/100, due, lapses, streak, level};
+  }
+  // 予測記憶保持率 R=exp(-経過日数/安定度)。低いほど忘れかけている。
+  function retention(p, now){
+    if(!p||!p.attempts.length) return null;
+    const days=Math.max(0,(now-p.attempts[p.attempts.length-1].t)/DAY);
+    return Math.exp(-days/Math.max(0.5, p.ivl||1));
+  }
   function record(id, ok, unknown){
     const now=Date.now();
-    let p=progress[id]; if(!p){p={attempts:[],level:0,due:0};progress[id]=p;}
+    let p=progress[id]; if(!p){p={attempts:[]};progress[id]=p;}
     p.attempts.push({t:now, ok:!!ok, unknown:!!unknown});
-    if(ok){ p.level=Math.min(p.level+1, INTERVALS.length-1); p.due=now+INTERVALS[p.level]*DAY; }
-    else { p.level=0; p.due=now+1*DAY; }
+    Object.assign(p, sched(p.attempts));
     jset('kakomon:progress', progress);
     if(typeof schedulePush==='function') schedulePush();
   }
-  function acc(p){ if(!p||!p.attempts.length) return null; const c=p.attempts.filter(a=>a.ok).length; return c/p.attempts.length; }
   function groupOf(q){
     const p=progress[q.id]; const now=Date.now();
     if(!p||!p.attempts.length) return 0;            // 未回答
@@ -345,14 +374,34 @@
     return true;
   }
   function buildQueue(filter, includeAll){
-    const list=questions.filter(q=>matchFilter(q,filter));
-    const ranked=list.map(q=>{
-      const p=progress[q.id]; const g=groupOf(q);
-      return {q, g, n:(p?p.attempts.length:0), a:(acc(p)==null?-1:acc(p)), r:Math.random()};
+    const now=Date.now();
+    // 区分ごとの正答率（未着手の新規問題は弱い区分から出すため）
+    const catAcc={};
+    questions.forEach(q=>{
+      const p=progress[q.id]; if(!p||!p.attempts.length) return;
+      const c=catAcc[q.category]||(catAcc[q.category]={t:0,c:0});
+      p.attempts.forEach(a=>{ c.t++; if(a.ok)c.c++; });
     });
-    const pool = includeAll ? ranked : ranked.filter(r=>r.g<=2);
-    // 弱点優先（g→出題回数→正答率）は維持し、同条件は乱数で毎回シャッフル
-    pool.sort((x,y)=> x.g-y.g || x.n-y.n || x.a-y.a || (x.r-y.r) );
+    const list=questions.filter(q=>matchFilter(q,filter));
+    const rows=list.map(q=>{
+      const p=progress[q.id]; const g=groupOf(q);
+      const d=difficulty[q.id];
+      const dw = d==='hard'?0.15 : d==='easy'?-0.1 : 0; // 体感難易度で微調整
+      let bucket, pr;
+      if(g===0){ // 新規: 正答率の低い区分を優先（実績3件未満の区分は中立0.5）
+        const ca=catAcc[q.category];
+        const weak = (ca&&ca.t>=3) ? 1-(ca.c/ca.t) : 0.5;
+        bucket=1; pr=weak+dw+Math.random()*0.15;
+      } else { // 既習: 忘れかけ(1-R)×間違えやすさ(lapses)で優先度
+        const R=retention(p, now);
+        pr=(1-R)+Math.min(p.lapses||0,5)*0.06+dw+Math.random()*0.02;
+        bucket=(p.due<=now)?0:2;
+      }
+      return {q, bucket, pr};
+    });
+    // bucket 0=復習期限到来（忘れかけ順）→ 1=新規（弱点区分順）→ 2=期限前（includeAll時のみ）
+    const pool = includeAll ? rows : rows.filter(r=>r.bucket<2);
+    pool.sort((x,y)=> x.bucket-y.bucket || y.pr-x.pr);
     return pool.map(r=>r.q.id);
   }
 
@@ -458,7 +507,7 @@
     // start session
     const p=el('div','panel'); p.appendChild(el('h3',null,'今すぐ学習を始める'));
     const dueTotal=nNew+nDueWrong+nDueRev;
-    const rec=el('button','startbtn wide','おすすめ（弱点順）<small>'+ (dueTotal? '未回答＋復習 '+dueTotal+'問' : '今日の復習はありません・全問から出題') +'</small>');
+    const rec=el('button','startbtn wide','おすすめ（忘却曲線順）<small>'+ (dueTotal? '未回答＋復習 '+dueTotal+'問' : '今日の復習はありません・全問から出題') +'</small>');
     rec.addEventListener('click',()=>startSession(null, dueTotal===0));
     p.appendChild(rec);
     v.appendChild(p);
@@ -466,7 +515,7 @@
     // by year
     const years=[...new Set(questions.map(q=>q.year))].filter(Boolean);
     if(years.length){
-      const yp=el('div','panel'); yp.appendChild(el('h3',null,'年度別に学習','<small>全問を弱点順で</small>'));
+      const yp=el('div','panel'); yp.appendChild(el('h3',null,'年度別に学習','<small>全問を忘却曲線順で</small>'));
       const g=el('div','startgrid');
       years.forEach(y=>{
         const cnt=questions.filter(q=>q.year===y).length;
@@ -479,7 +528,7 @@
     // by category (+ calc) — checkbox multi-select
     const cats=[...new Set(questions.map(q=>q.category))].filter(Boolean);
     if(cats.length){
-      const cp=el('div','panel'); cp.appendChild(el('h3',null,'区分を選んで学習','<small>複数選択可・弱点順で出題</small>'));
+      const cp=el('div','panel'); cp.appendChild(el('h3',null,'区分を選んで学習','<small>複数選択可・忘却曲線順で出題</small>'));
 
       // タップ／クリックで選択を切り替えるチップ（チェックボックスは使わない）
       function chip(grid, val, label, count, on){
@@ -1068,9 +1117,7 @@
       const B=(b&&b[id]&&b[id].attempts)?b[id].attempts:[];
       const m=new Map(); [...A,...B].forEach(x=>{ if(x&&typeof x.t==='number') m.set(x.t,x); });
       const att=[...m.values()].sort((x,y)=>x.t-y.t);
-      let level=0,due=0;
-      att.forEach(x=>{ if(x.ok){ level=Math.min(level+1,INTERVALS.length-1); due=x.t+INTERVALS[level]*DAY; } else { level=0; due=x.t+DAY; } });
-      out[id]={attempts:att, level, due};
+      out[id]=Object.assign({attempts:att}, sched(att));
     }
     return out;
   }
@@ -1166,6 +1213,8 @@
     $('#syncNote').addEventListener('click', onSyncNoteClick);
     questions = await jget('kakomon:questions', []);
     progress = await jget('kakomon:progress', {});
+    // 旧スキーマ(固定間隔)からの移行: 履歴から ivl/ef/due 等を再計算
+    Object.values(progress).forEach(p=>{ if(p&&p.attempts) Object.assign(p, sched(p.attempts)); });
     difficulty = await jget('kakomon:difficulty', {});
     // ensure shape
     questions.forEach(q=>{ if(q.hasImage===undefined) q.hasImage=false; if(q.calc===undefined) q.calc=isCalcQ(q.id, q); });
