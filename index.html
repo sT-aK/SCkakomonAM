@@ -18,12 +18,12 @@
     --radius:16px; --blur:blur(14px);
     --jp:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic","Meiryo","Noto Sans JP",system-ui,sans-serif;
   }
-  /* スクロールは #app-root 内部に閉じ込める: ページ全体のラバーバンドで
-     背景の継ぎ目や html の単色が露出しないように（iOSは attachment:fixed 非対応） */
+  /* スクロールは .wrap 内部に閉じ込める: ページ全体のラバーバンドで
+     背景の継ぎ目や html の単色が露出しないように（iOSは attachment:fixed 非対応）。
+     html にも同じグラデーションを敷き、万一の隙間も地色が馴染むようにする */
   html,body{margin:0; padding:0; height:100%; overflow:hidden; overscroll-behavior:none;}
-  html,body{height:100dvh;} /* iOSのツールバー伸縮に追従（対応環境のみ上書き） */
-  html{background:#0ea5a3;}
-  html.night{background:#0b1120;}
+  html{background:#0ea5a3 linear-gradient(160deg,#0ea5a3 0%,#3b82f6 55%,#8b5cf6 100%);}
+  html.night{background:#0b1120 linear-gradient(160deg,#0b1120 0%,#1e1b4b 55%,#3b0764 100%);}
   /* 昼テーマ「オーロラ」（6〜17時） */
   #app-root{
     --bg-grad:linear-gradient(160deg,#0ea5a3 0%,#3b82f6 55%,#8b5cf6 100%);
@@ -60,22 +60,20 @@
     --on-grad:rgba(236,234,251,.8);
     --shadow:0 8px 24px rgba(0,0,0,.35);
   }
-  /* 背景はスクローラ自身に描く（attachment:scroll=要素の枠に固定）。
-     内容がバウンスしても常に画面全体がグラデーションのまま。
-     overscroll-behavior:none でスクロール連鎖を止め、document側の
-     ラバーバンド（ページごと下にずれる現象）を防ぐ */
-  #app-root{font-family:var(--jp); color:var(--ink); background:var(--bg-grad); -webkit-font-smoothing:antialiased; line-height:1.6; height:100%; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:none;}
+  /* アプリシェル: ヘッダー / スクロール領域(.wrap) / フッター の3段フレックス。
+     ヘッダー・フッターは静的配置なので viewport 計算の癖に依存せず上下端に吸着する */
+  #app-root{font-family:var(--jp); color:var(--ink); background:var(--bg-grad); -webkit-font-smoothing:antialiased; line-height:1.6; height:100%; display:flex; flex-direction:column; overflow:hidden; overscroll-behavior:none;}
   .stat,.panel,.qcard,.scorecard,.daylist{-webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur);}
   #app-root *{box-sizing:border-box;}
-  .wrap{max-width:760px; margin:0 auto; padding:18px 16px 90px;}
-  .topbar{position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:12px; padding:max(8px,env(safe-area-inset-top)) 10px 12px; margin:0 -8px; background:var(--tabbar-bg); -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur); border-radius:0 0 14px 14px; box-shadow:var(--shadow);}
+  .wrap{flex:1; min-height:0; width:100%; max-width:760px; margin:0 auto; padding:14px 16px 24px; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:none;}
+  .topbar{flex:none; display:flex; align-items:center; gap:12px; padding:calc(env(safe-area-inset-top,0px) + 10px) max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left)); background:var(--tabbar-bg); -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur); border-bottom:1px solid var(--line);}
   .logo{font-weight:800; font-size:19px; letter-spacing:.02em;}
   .logo .dot{color:var(--primary);}
   .persist-note{margin-left:auto; font-size:11.5px; color:var(--muted); background:var(--card2); border:1px solid var(--line); padding:4px 9px; border-radius:999px;}
   .persist-note.warn{color:var(--due); border-color:var(--due-soft); background:var(--due-soft);}
   #syncNote{font-family:inherit; -webkit-appearance:none; appearance:none; cursor:pointer;}
   #syncNote:active{opacity:.7;}
-  .tabs{position:fixed; left:0; right:0; bottom:0; z-index:50; max-width:760px; margin:0 auto; display:flex; gap:6px; background:var(--tabbar-bg); -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur); border-top:1px solid var(--line); padding:6px max(10px,env(safe-area-inset-left)) calc(6px + env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-right)); border-radius:14px 14px 0 0; box-shadow:0 -3px 16px rgba(20,18,30,.10);}
+  .tabs{flex:none; display:flex; gap:6px; background:var(--tabbar-bg); -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur); border-top:1px solid var(--line); padding:6px max(10px,env(safe-area-inset-left)) calc(6px + env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-right)); box-shadow:0 -3px 16px rgba(20,18,30,.10);}
   .tab{flex:1; text-align:center; padding:11px 4px; border-radius:10px; font-size:13.5px; font-weight:600; color:var(--muted); cursor:pointer; border:none; background:transparent; font-family:inherit; transition:.15s;}
   .tab[aria-selected="true"]{background:var(--tab-on-bg); color:var(--tab-on-ink); box-shadow:var(--shadow);}
   .view{display:none;} .view.active{display:block;}
@@ -214,7 +212,7 @@
   /* ---- mobile tuning ---- */
   html{ -webkit-text-size-adjust:100%; }
   textarea,input,select{ font-size:16px; }
-  .wrap{ padding-left:max(16px,env(safe-area-inset-left)); padding-right:max(16px,env(safe-area-inset-right)); padding-bottom:calc(86px + env(safe-area-inset-bottom)); }
+  .wrap{ padding-left:max(16px,env(safe-area-inset-left)); padding-right:max(16px,env(safe-area-inset-right)); }
   button{ -webkit-tap-highlight-color:transparent; }
   .tab{ min-height:40px; }
   .choice{ min-height:48px; }
@@ -226,22 +224,21 @@
   }
 </style>
 
+<div class="topbar">
+  <div class="logo">SC 過去問<span class="dot">道場</span> <span style="font-size:11px;font-weight:600;color:var(--muted)">v2</span></div>
+  <button id="syncNote" class="persist-note" type="button">☁ 同期OFF</button>
+</div>
 <div class="wrap">
-  <div class="topbar">
-    <div class="logo">SC 過去問<span class="dot">道場</span> <span style="font-size:11px;font-weight:600;color:var(--muted)">v2</span></div>
-    <button id="syncNote" class="persist-note" type="button">☁ 同期OFF</button>
-  </div>
-  <div class="tabs" role="tablist">
-    <button class="tab" role="tab" data-view="home" aria-selected="true">ホーム</button>
-    <button class="tab" role="tab" data-view="study" aria-selected="false">学習</button>
-    <button class="tab" role="tab" data-view="hist" aria-selected="false">履歴</button>
-    <button class="tab" role="tab" data-view="manage" aria-selected="false">問題管理</button>
-  </div>
-
   <div id="view-home" class="view active"></div>
   <div id="view-study" class="view"></div>
   <div id="view-hist" class="view"></div>
   <div id="view-manage" class="view"></div>
+</div>
+<div class="tabs" role="tablist">
+  <button class="tab" role="tab" data-view="home" aria-selected="true">ホーム</button>
+  <button class="tab" role="tab" data-view="study" aria-selected="false">学習</button>
+  <button class="tab" role="tab" data-view="hist" aria-selected="false">履歴</button>
+  <button class="tab" role="tab" data-view="manage" aria-selected="false">問題管理</button>
 </div>
 </div>
 
@@ -255,6 +252,7 @@
   const SYNC_FILENAME  = "kakomon-sync.json";
   const SCHEMA_VERSION = 1;
   const root = document.getElementById('app-root');
+  const wrap = root.querySelector('.wrap'); // 唯一のスクロールコンテナ
 
   // ---------- テーマ自動切替: 昼(6〜17時)=オーロラ / 夜(18〜5時)=ナイトグラス ----------
   function applyTheme(){
@@ -420,7 +418,7 @@
     if(view==='study') renderStudy();
     if(view==='hist') renderHist();
     if(view==='manage') renderManage();
-    root.scrollTo(0,0);
+    wrap.scrollTo(0,0);
   }
   root.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>show(t.dataset.view)));
 
@@ -452,8 +450,8 @@
     root.addEventListener('touchmove', e=>{
       if(e.touches.length!==1) return;
       const dy=e.touches[0].clientY-y0;
-      const atTop=root.scrollTop<=0;
-      const atEnd=root.scrollTop+root.clientHeight>=root.scrollHeight-1;
+      const atTop=wrap.scrollTop<=0;
+      const atEnd=wrap.scrollTop+wrap.clientHeight>=wrap.scrollHeight-1;
       if((atTop&&dy>0)||(atEnd&&dy<0)) e.preventDefault();
     }, {passive:false});
   })();
