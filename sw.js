@@ -1,4 +1,4 @@
-const CACHE = 'kakomon-v11';
+const CACHE = 'kakomon-v12';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest',
   './data/index.json',
@@ -16,8 +16,10 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
-  // Google API / 認証は常にネットワーク（キャッシュしない）
-  if (u.hostname.includes('googleapis.com') || u.hostname.includes('accounts.google.com')) return;
+  // Google API / 認証は常にネットワーク（キャッシュしない）。
+  // /__/auth/ は vercel.json のrewriteでFirebase認証ヘルパーにプロキシされる同一オリジンパス
+  if (u.hostname.includes('googleapis.com') || u.hostname.includes('accounts.google.com')
+      || u.pathname.startsWith('/__/auth/')) return;
   if (e.request.method !== 'GET') return;
   e.respondWith(
     caches.match(e.request).then(r => r || fetch(e.request).then(resp => {
