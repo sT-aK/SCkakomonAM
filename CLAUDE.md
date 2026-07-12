@@ -11,7 +11,7 @@ App (PWA) for studying past exam questions ("過去問") for the **情報処理�
 
 It is a flashcard-style quiz app with a spaced-repetition (SRS) scheduler,
 local history/stats tracking, manual question entry/import, and optional
-Google Drive sync of progress across devices.
+Firebase (Auth + Firestore) sync of progress across devices.
 
 ## Tech Stack & Architecture
 
@@ -26,9 +26,18 @@ Google Drive sync of progress across devices.
   runtime via `fetch`.
 - The app is installable as a PWA (`manifest.webmanifest` + `sw.js` for
   offline caching).
-- Optional cloud sync uses **Google Identity Services (GIS)** OAuth +
-  **Google Drive `appDataFolder`** to store a small JSON blob of progress and
-  custom (user-added) questions.
+- Optional cloud sync uses **Firebase Auth (Googleログイン)** + **Cloud
+  Firestore**, loaded via the pinned **compat CDN scripts** in `<head>`
+  (`firebase-{app,auth,firestore}-compat.js` — the only external JS). The
+  `FIREBASE_CONFIG` object near the top of the script is a public identifier
+  set and safe to commit; protection comes from Firestore security rules
+  (`firestore.rules` — deployed by pasting into the Firebase console) and the
+  Auth authorized-domains list.
+- **Hosting**: Vercel is the primary origin (GitHub integration auto-deploys
+  `main`; `vercel.json` sets no-cache headers for `sw.js`/`index.html` and a
+  `/__/auth/*` rewrite that proxies Firebase auth so `signInWithRedirect`
+  works first-party on iOS). GitHub Pages (`st-ak.github.io/SCkakomonAM/`)
+  remains as a legacy mirror where login works via popup only.
 
 ## Repository Structure
 
@@ -37,6 +46,8 @@ Google Drive sync of progress across devices.
 ├── index.html              # Entire app: HTML shell, CSS, and JS (single IIFE)
 ├── manifest.webmanifest    # PWA manifest (name, theme color, icons)
 ├── sw.js                   # Service worker: cache-first offline support
+├── vercel.json             # Vercel headers (sw.js no-cache) + /__/auth/* rewrite
+├── firestore.rules         # Firestore security rules (doc copy; deploy via console)
 ├── icons/
 │   ├── icon-192.png
 │   └── icon-512.png
@@ -136,13 +147,20 @@ A manifest listing every dataset file the app should fetch and merge on boot:
 - **Import/upsert**: `upsert(arr)` merges an array of question objects into
   `questions` by `id` (update if exists, add if new), persists to storage,
   and triggers a sync push if enabled.
-- **Google Drive sync**: gated by `GOOGLE_CLIENT_ID` (hardcoded OAuth client
-  ID near the top of the script). Stores `{schema, updatedAt, deviceId,
-  progress, customQuestions, customImages}` as `kakomon-sync.json` in the
-  user's Drive `appDataFolder`. `mergeProgress()` does a union-merge of
-  attempt logs by timestamp, then recomputes `level`/`due`. Bundled
-  (built-in) questions are never pushed/pulled — only `customQuestions`
-  (i.e. `id not in bundledIds`).
+- **Firebase sync**: configured by `FIREBASE_CONFIG` near the top of the
+  script (public; `authDomain` is deliberately the Vercel domain — see
+  `vercel.json`'s `/__/auth/*` rewrite). Login uses `signInWithPopup` with a
+  `signInWithRedirect` fallback; `onAuthStateChanged` auto-resumes sync when
+  the `kakomon:syncEnabled` localStorage flag is set. Data model (schema 2):
+  `users/{uid}/sync/main` holds `{schema, updatedAt, deviceId, progress,
+  difficulty, customQuestions}` (guarded to stay under Firestore's 1 MiB doc
+  limit) and each custom-question image lives in `users/{uid}/images/{qid}`
+  as `{data, updatedAt}` (pulled only when missing locally). The sync loop is
+  pull→merge→push (`pullMergePush`), debounced via `schedulePush()` on every
+  answer/import and re-run on `visibilitychange`. `mergeProgress()` does a
+  union-merge of attempt logs by timestamp, then recomputes SRS state via
+  `sched()`. Bundled (built-in) questions are never pushed/pulled — only
+  `customQuestions` (i.e. `id not in bundledIds`).
 
 ## Development Workflow
 
@@ -201,12 +219,17 @@ When adding a new past-exam question set (e.g. a new term's 午前I questions):
 
 ## Notes / Gotchas
 
-- `GOOGLE_CLIENT_ID` in `index.html` is a real OAuth client ID tied to this
-  app's Drive `appDataFolder` scope — don't remove/replace it casually, and
-  don't commit any *other* secrets (API keys, tokens) into this repo.
-- The service worker explicitly bypasses caching for `googleapis.com` and
-  `accounts.google.com` requests — preserve this when editing `sw.js` so auth
-  always hits the network.
+- `FIREBASE_CONFIG` in `index.html` contains public identifiers (safe to
+  commit) — don't commit any *other* secrets (API keys with privileges,
+  tokens) into this repo. Its `authDomain` must stay in lock-step with the
+  Vercel production domain AND the rewrite destination in `vercel.json` AND
+  Firebase console's Auth authorized-domains list; if the domain ever
+  changes, update all three.
+- The service worker explicitly bypasses caching for `googleapis.com`,
+  `accounts.google.com` and same-origin `/__/auth/` requests — preserve this
+  when editing `sw.js` so auth/Firestore always hit the network. The pinned
+  gstatic Firebase SDK scripts are runtime-cached by the SW (do NOT add them
+  to `ASSETS`; cross-origin `cache.addAll` would break install).
 - `manifest.webmanifest` and `icons/` define the installable PWA icon set
   (192px and 512px, `any maskable`); update both sizes together if changing
   the app icon.

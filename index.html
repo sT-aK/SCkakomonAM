@@ -9,7 +9,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js" defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js" defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js" defer></script>
 </head>
 <body>
 <div id="app-root">
@@ -246,13 +248,18 @@
 
 <script>
 (function(){
-  // ===== Google 同期 設定 =====
-  // ↓↓↓ ここに自分の OAuth クライアントID を貼り付ける ↓↓↓
-  const GOOGLE_CLIENT_ID = "809848839237-bbtsk9neca7c8nsitne8ve5q60u1f2e9.apps.googleusercontent.com";
-  // 例: 1234567890-abcdef.apps.googleusercontent.com
-  const DRIVE_SCOPE    = "https://www.googleapis.com/auth/drive.appdata";
-  const SYNC_FILENAME  = "kakomon-sync.json";
-  const SCHEMA_VERSION = 1;
+  // ===== Firebase 同期 設定 =====
+  // Firebase コンソール > プロジェクトの設定 > マイアプリ の firebaseConfig を貼る。
+  // これらは公開識別子でありコミット可（保護は Firestore ルールと承認済みドメインで行う）。
+  // authDomain は意図的に Vercel の本番ドメインにする（vercel.json の /__/auth/* rewrite で
+  // <projectId>.firebaseapp.com にプロキシし、iOSのITPでもリダイレクト認証が動くようにするため）。
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyCuZU3w5P5YNFU-Tm_Dn-unIAyaaOZ2zWw",
+    authDomain: "s-ckakomon-am.vercel.app", // Vercel本番ドメイン（firebaseapp.comではない・意図的）
+    projectId: "sckakomonam-a46eb",
+    appId: "1:973281837349:web:113643e0e16c01a09f5acc"
+  };
+  const SCHEMA_VERSION = 2; // v2: customImages を本体から分離し images/{qid} に保存
   const root = document.getElementById('app-root');
   const wrap = root.querySelector('.wrap'); // 唯一のスクロールコンテナ
 
@@ -918,7 +925,7 @@
   function renderManage(){
     const v=$('#view-manage'); v.innerHTML='';
     // Google同期パネル
-    const gp=el('div','panel'); gp.appendChild(el('h3',null,'Google ドライブ同期','<small>端末間で履歴を同期</small>'));
+    const gp=el('div','panel'); gp.appendChild(el('h3',null,'クラウド同期','<small>端末間で履歴を同期</small>'));
     const grow=el('div'); grow.style.cssText='display:flex;gap:10px;flex-wrap:wrap';
     const onBtn=el('button','btn sm'); onBtn.textContent='Googleでログインして同期ON';
     onBtn.addEventListener('click',enableSync);
@@ -1069,72 +1076,30 @@
 
   function escapeHTML(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-  // ================= Google Drive Sync =================
-  let tokenClient=null, accessToken=null, driveFileId=null;
-  let syncEnabled=false, pushTimer=null, syncBusy=false;
+  // ================= Firebase Sync (Auth + Firestore) =================
+  let fbUser=null, fbReady=null, syncEnabled=false, pushTimer=null, syncBusy=false;
+  const pushedImgs=new Set(); // このセッションで送信済みの画像ID（再送抑止）
   const deviceId = (function(){
     let d=null; try{ d=localStorage.getItem('kakomon:deviceId'); }catch(e){}
     if(!d){ d='dev-'+Math.random().toString(36).slice(2); try{ localStorage.setItem('kakomon:deviceId',d); }catch(e){} }
     return d;
   })();
 
-  function waitForGIS(){
-    return new Promise((resolve,reject)=>{
-      if(window.google && google.accounts && google.accounts.oauth2) return resolve();
+  function waitForFirebase(){
+    if(fbReady) return fbReady;
+    fbReady=new Promise((resolve,reject)=>{
       let n=0; const t=setInterval(()=>{
-        if(window.google && google.accounts && google.accounts.oauth2){ clearInterval(t); resolve(); }
-        else if(++n>100){ clearInterval(t); reject(new Error('GIS load timeout')); }
+        if(window.firebase && firebase.auth && firebase.firestore){
+          clearInterval(t);
+          if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+          resolve();
+        } else if(++n>100){ clearInterval(t); reject(new Error('Firebase load timeout')); }
       },100);
     });
+    return fbReady;
   }
-  function ensureTokenClient(){
-    if(tokenClient) return;
-    tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: GOOGLE_CLIENT_ID, scope: DRIVE_SCOPE, callback: ()=>{}
-    });
-  }
-  function requestToken(interactive){
-    return new Promise((resolve,reject)=>{
-      ensureTokenClient();
-      tokenClient.callback=(resp)=>{
-        if(resp && resp.error){ reject(resp); return; }
-        accessToken = resp.access_token; resolve(accessToken);
-      };
-      try{ tokenClient.requestAccessToken({ prompt: interactive ? 'consent' : '' }); }
-      catch(e){ reject(e); }
-    });
-  }
-
-  async function driveFind(){
-    const q=encodeURIComponent("name='"+SYNC_FILENAME+"'");
-    const url='https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q='+q+'&fields=files(id,modifiedTime)';
-    const r=await fetch(url,{headers:{Authorization:'Bearer '+accessToken}});
-    if(r.status===401) throw {status:401};
-    const j=await r.json(); return (j.files&&j.files[0])||null;
-  }
-  async function driveDownload(id){
-    const r=await fetch('https://www.googleapis.com/drive/v3/files/'+id+'?alt=media',{headers:{Authorization:'Bearer '+accessToken}});
-    if(r.status===401) throw {status:401};
-    if(!r.ok) return null;
-    return await r.json();
-  }
-  async function driveUpload(content){
-    const body=JSON.stringify(content);
-    if(driveFileId){
-      const r=await fetch('https://www.googleapis.com/upload/drive/v3/files/'+driveFileId+'?uploadType=media',
-        {method:'PATCH',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'application/json'},body});
-      if(r.status===401) throw {status:401};
-    } else {
-      const boundary='kakomon'+Date.now();
-      const meta={name:SYNC_FILENAME, parents:['appDataFolder']};
-      const multipart='--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify(meta)
-        +'\r\n--'+boundary+'\r\nContent-Type: application/json\r\n\r\n'+body+'\r\n--'+boundary+'--';
-      const r=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
-        {method:'POST',headers:{Authorization:'Bearer '+accessToken,'Content-Type':'multipart/related; boundary='+boundary},body:multipart});
-      if(r.status===401) throw {status:401};
-      const j=await r.json(); driveFileId=j.id;
-    }
-  }
+  function syncRef(){ return firebase.firestore().doc('users/'+fbUser.uid+'/sync/main'); }
+  function imgRef(id){ return firebase.firestore().doc('users/'+fbUser.uid+'/images/'+id); }
 
   function buildSyncBlob(){
     const customQ = questions.filter(q=>!bundledIds.has(q.id));
@@ -1176,11 +1141,29 @@
     }
   }
   async function pullMergePush(){
-    if(syncBusy) return; syncBusy=true;
+    if(syncBusy || !fbUser) return; syncBusy=true;
     try{
-      const f=await driveFind();
-      if(f){ driveFileId=f.id; const remote=await driveDownload(f.id); await applyRemote(remote); }
-      await driveUpload(buildSyncBlob());
+      const snap=await syncRef().get();
+      if(snap.exists){
+        const remote=snap.data(); remote.customImages={};
+        // 画像はローカルに無いものだけ images/{qid} から取得
+        for(const rq of (remote.customQuestions||[])){
+          if(rq && rq.id && rq.hasImage && !rq.id.includes('/') && !(await jget('kakomon:img:'+rq.id, null))){
+            const im=await imgRef(rq.id).get();
+            if(im.exists) remote.customImages[rq.id]=im.get('data');
+          }
+        }
+        await applyRemote(remote);
+      }
+      const blob=buildSyncBlob(); const imgs=blob.customImages; delete blob.customImages;
+      if(JSON.stringify(blob).length>900000){ console.warn('sync: blob too large, skipped'); setSyncStatus('error'); return; }
+      await syncRef().set(blob);
+      for(const id of Object.keys(imgs)){
+        if(pushedImgs.has(id)) continue;
+        if(id.includes('/') || imgs[id].length>900000){ console.warn('sync: image skipped:', id); continue; }
+        await imgRef(id).set({data:imgs[id], updatedAt:Date.now()});
+        pushedImgs.add(id);
+      }
       setSyncStatus('ok');
     } finally { syncBusy=false; }
   }
@@ -1190,10 +1173,8 @@
     pushTimer=setTimeout(async ()=>{
       try{ await pullMergePush(); }
       catch(e){
-        if(e && e.status===401){
-          try{ await requestToken(false); await pullMergePush(); }
-          catch(_){ setSyncStatus('reauth'); }
-        } else { setSyncStatus('error'); }
+        const c=e&&e.code;
+        setSyncStatus(c==='unauthenticated'||c==='permission-denied' ? 'reauth' : 'error');
       }
     }, 4000);
   }
@@ -1213,8 +1194,19 @@
 
   async function enableSync(){
     try{
-      await waitForGIS();
-      await requestToken(true);
+      await waitForFirebase();
+      const prov=new firebase.auth.GoogleAuthProvider();
+      try{ await firebase.auth().signInWithPopup(prov); }
+      catch(e){
+        // ポップアップ不可の環境（iOSスタンドアロンPWA等）はリダイレクトへ。
+        // 戻り後の再起動時に initSync の getRedirectResult/onAuthStateChanged が拾う。
+        if(e && ['auth/popup-blocked','auth/operation-not-supported-in-this-environment','auth/web-storage-unsupported'].indexOf(e.code)>=0){
+          try{ localStorage.setItem('kakomon:syncEnabled','1'); }catch(_){}
+          await firebase.auth().signInWithRedirect(prov); return;
+        }
+        throw e;
+      }
+      fbUser=firebase.auth().currentUser;
       syncEnabled=true;
       try{ localStorage.setItem('kakomon:syncEnabled','1'); }catch(e){}
       await pullMergePush();
@@ -1222,23 +1214,32 @@
     }catch(e){ console.error(e); setSyncStatus('error'); alert('Googleログインに失敗しました。'); }
   }
   async function disableSync(){
-    syncEnabled=false;
+    syncEnabled=false; fbUser=null;
     try{ localStorage.removeItem('kakomon:syncEnabled'); }catch(e){}
-    if(accessToken && window.google){ try{ google.accounts.oauth2.revoke(accessToken,()=>{}); }catch(e){} }
-    accessToken=null; driveFileId=null; setSyncStatus('off');
+    try{ await waitForFirebase(); await firebase.auth().signOut(); }catch(e){}
+    setSyncStatus('off');
   }
   async function initSync(){
     let want=false; try{ want=localStorage.getItem('kakomon:syncEnabled')==='1'; }catch(e){}
     setSyncStatus(want?'reauth':'off');
-    if(!want) return;
-    try{
-      await waitForGIS();
-      await requestToken(false);
-      syncEnabled=true;
-      await pullMergePush();
-    }catch(e){ setSyncStatus('reauth'); }
+    try{ await waitForFirebase(); }
+    catch(e){ if(want) setSyncStatus('error'); return; } // SDK未達（オフライン等）でも本体は動かす
+    firebase.auth().getRedirectResult().then(r=>{
+      if(r && r.user){ try{ localStorage.setItem('kakomon:syncEnabled','1'); }catch(e){} }
+    }).catch(e=>console.error(e));
+    firebase.auth().onAuthStateChanged(async u=>{
+      fbUser=u;
+      let w=false; try{ w=localStorage.getItem('kakomon:syncEnabled')==='1'; }catch(e){}
+      if(u && w){
+        syncEnabled=true;
+        try{ await pullMergePush(); }
+        catch(e){ console.error(e); setSyncStatus('error'); }
+      } else if(w){ setSyncStatus('reauth'); } // 同期ON設定だが未ログイン → ☁タップで再ログイン
+    });
   }
-  // ================= /Google Drive Sync =================
+  // アプリに戻ってきたタイミングで他端末の進捗を取り込む
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && syncEnabled) schedulePush(); });
+  // ================= /Firebase Sync =================
 
   // ---------- boot ----------
   (async function init(){
@@ -1266,8 +1267,9 @@
 
     show('home');
 
-    // Google同期（ログイン済みなら自動で読み込み→マージ）
-    try{ await initSync(); }catch(e){ console.error(e); }
+    // クラウド同期（ログイン済みなら自動で読み込み→マージ）。
+    // SDK読込待ちでSW登録を遅らせないよう await しない
+    initSync().catch(e=>console.error(e));
 
     // PWA: Service Worker 登録
     if('serviceWorker' in navigator){ try{ navigator.serviceWorker.register('./sw.js'); }catch(e){} }
