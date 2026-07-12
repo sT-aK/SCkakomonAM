@@ -254,10 +254,10 @@
   // authDomain は意図的に Vercel の本番ドメインにする（vercel.json の /__/auth/* rewrite で
   // <projectId>.firebaseapp.com にプロキシし、iOSのITPでもリダイレクト認証が動くようにするため）。
   const FIREBASE_CONFIG = {
-    apiKey: "FIREBASE_API_KEY",
-    authDomain: "VERCEL_DOMAIN",       // 例: sckakomon-am.vercel.app
-    projectId: "FIREBASE_PROJECT_ID",
-    appId: "FIREBASE_APP_ID"
+    apiKey: "AIzaSyCuZU3w5P5YNFU-Tm_Dn-unIAyaaOZ2zWw",
+    authDomain: "s-ckakomon-am.vercel.app", // Vercel本番ドメイン（firebaseapp.comではない・意図的）
+    projectId: "sckakomonam-a46eb",
+    appId: "1:973281837349:web:113643e0e16c01a09f5acc"
   };
   const SCHEMA_VERSION = 2; // v2: customImages を本体から分離し images/{qid} に保存
   const root = document.getElementById('app-root');
