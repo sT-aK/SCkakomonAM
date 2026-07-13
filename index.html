@@ -1099,7 +1099,9 @@
   async function importBackup(file){
     try{
       const data=JSON.parse(await file.text());
-      const arr=Array.isArray(data)?data:(data.questions||[]);
+      const arr=Array.isArray(data)?data:(data.questions||data.customQuestions||[]);
+      // 旧Drive同期形式は画像を customImages に別持ち → 各問題へ添付
+      if(data.customImages) arr.forEach(q=>{ if(q&&q.id&&!q.image&&data.customImages[q.id]) q.image=data.customImages[q.id]; });
       let qres={added:0,updated:0};
       if(arr.length) qres=await upsert(arr); // 画像も含めて取り込み
       let pcount=0;
