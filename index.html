@@ -24,9 +24,10 @@
      背景の継ぎ目や html の単色が露出しないように（iOSは attachment:fixed 非対応）。
      html にも同じグラデーションを敷き、万一の隙間も地色が馴染むようにする */
   html,body{margin:0; padding:0; height:100%; overflow:hidden; overscroll-behavior:none;}
-  /* 地色はグラデーション下端色（万一シェル下に隙間が出てもフッター側に馴染む） */
-  html{background:#8b5cf6 linear-gradient(160deg,#0ea5a3 0%,#3b82f6 55%,#8b5cf6 100%);}
-  html.night{background:#3b0764 linear-gradient(160deg,#0b1120 0%,#1e1b4b 55%,#3b0764 100%);}
+  /* 地色（キャンバス色）はタブバーの見た目に合わせる。Safariの上下バー領域や
+     スタンドアロンでビューポート外に露出する帯がタブバーの続きに見えるように */
+  html{background:#d7b6fb linear-gradient(160deg,#0ea5a3 0%,#3b82f6 55%,#8b5cf6 100%);}
+  html.night{background:#240d43 linear-gradient(160deg,#0b1120 0%,#1e1b4b 55%,#3b0764 100%);}
   /* 昼テーマ「オーロラ」（6〜17時） */
   #app-root{
     --bg-grad:linear-gradient(160deg,#0ea5a3 0%,#3b82f6 55%,#8b5cf6 100%);
@@ -84,6 +85,10 @@
      bottom:0 が実端に付き、padding-bottom(safe-area)ぶんラベルを持ち上げつつ
      背景はホームインジケータ領域まで途切れず続く。手動オフセット/モード分岐なし。 */
   .tabs{position:fixed; left:0; right:0; bottom:0; z-index:50; max-width:760px; margin-inline:auto; display:flex; gap:6px; background:var(--tabbar-bg); -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur); border-top:1px solid var(--line); padding:6px max(10px,env(safe-area-inset-left)) calc(6px + env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-right)); box-shadow:0 -3px 16px rgba(20,18,30,.10);}
+  /* ビューポート下に帯が露出しても（iOSスタンドアロンの計算癖）タブバーの続きに見せる延長部 */
+  .tabs::after{content:''; position:absolute; left:0; right:0; top:100%; height:150px; background:var(--tabbar-bg); pointer-events:none;}
+  .topbar{position:relative;}
+  .topbar::before{content:''; position:absolute; left:0; right:0; bottom:100%; height:150px; background:var(--tabbar-bg); pointer-events:none;}
   .tab{flex:1; text-align:center; padding:11px 4px; border-radius:10px; font-size:13.5px; font-weight:600; color:var(--muted); cursor:pointer; border:none; background:transparent; font-family:inherit; transition:.15s;}
   .tab[aria-selected="true"]{background:var(--tab-on-bg); color:var(--tab-on-ink); box-shadow:var(--shadow);}
   .view{display:none;} .view.active{display:block;}
