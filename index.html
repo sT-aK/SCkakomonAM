@@ -81,6 +81,28 @@
   .tab{flex:1; text-align:center; padding:11px 4px; border-radius:10px; font-size:13.5px; font-weight:600; color:var(--muted); cursor:pointer; border:none; background:transparent; font-family:inherit; transition:.15s;}
   .tab[aria-selected="true"]{background:var(--tab-on-bg); color:var(--tab-on-ink); box-shadow:var(--shadow);}
   .view{display:none;} .view.active{display:block;}
+  /* 画面切替のフェードイン（display:none→block で毎回再生される） */
+  .view.active{animation:viewIn .28s ease both;}
+  @keyframes viewIn{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:none;}}
+  /* タップの触覚的フィードバック（押すと少し沈む・縮む） */
+  .btn,.nextbtn,.dunno,.skipbtn,.seg button,.persist-note,.linkbtn{transition:transform .12s ease, background .15s, color .15s, border-color .15s, box-shadow .15s, opacity .15s, filter .15s;}
+  .startbtn:active,.nextbtn:active,.btn:active,.dunno:active{transform:translateY(1px) scale(.985);}
+  .tab:active,.diff-btn:active,.seg button:active,.chk:active,.choice:active,.persist-note:active,.linkbtn:active{transform:scale(.95);}
+  /* 正解の「いいね」演出 */
+  .like-burst{position:absolute; left:50%; top:42%; font-size:92px; line-height:1; pointer-events:none; z-index:6; will-change:transform,opacity; animation:likePop 1s cubic-bezier(.2,.8,.3,1) forwards; filter:drop-shadow(0 8px 16px rgba(0,0,0,.28));}
+  @keyframes likePop{
+    0%{transform:translate(-50%,-50%) scale(0) rotate(-16deg); opacity:0;}
+    22%{transform:translate(-50%,-52%) scale(1.18) rotate(7deg); opacity:1;}
+    42%{transform:translate(-50%,-54%) scale(.94) rotate(-2deg); opacity:1;}
+    60%{transform:translate(-50%,-54%) scale(1) rotate(0); opacity:1;}
+    100%{transform:translate(-50%,-72%) scale(1) rotate(0); opacity:0;}
+  }
+  .feedback.ok{animation:okPulse .42s ease;}
+  @keyframes okPulse{0%{transform:scale(.96);} 55%{transform:scale(1.015);} 100%{transform:scale(1);}}
+  @media (prefers-reduced-motion:reduce){
+    .view.active,.like-burst,.feedback.ok{animation:none;}
+    *{transition-duration:.01ms !important;}
+  }
   .grid{display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-bottom:16px;}
   .stat{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:15px 16px;}
   .stat .num{font-size:30px; font-weight:800; line-height:1.1; font-variant-numeric:tabular-nums;}
@@ -151,7 +173,7 @@
   .badge{display:inline-block; font-size:11px; font-weight:700; padding:3px 9px; border-radius:99px;}
   .badge.cat{background:var(--primary-soft); color:var(--primary);}
   .badge.yr{background:var(--card2); color:var(--muted);}
-  .qcard{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:18px; box-shadow:var(--shadow);}
+  .qcard{position:relative; background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:18px; box-shadow:var(--shadow);}
   .qmeta{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;}
   .qhist{display:flex; gap:4px; flex-wrap:wrap; margin-bottom:10px; font-size:15px; line-height:1;}
   .qtext{font-size:15.5px; white-space:pre-wrap; margin-bottom:14px;}
@@ -758,9 +780,14 @@
       session.seen.add(q.id);
       if(ok){ session.done.add(q.id); }
       else if(!session.single){ if(session.ids.indexOf(q.id)===-1) session.ids.push(q.id); } // re-queue at end（1問解き直しは再出題しない）
+      if(ok){ // 正解のいいね演出
+        const like=el('div','like-burst','👍');
+        card.appendChild(like);
+        like.addEventListener('animationend',()=>like.remove());
+      }
       const fbx=el('div','feedback '+(ok?'ok':'ng'));
       const title = ok?'正解':(unknown?'分からない（不正解）':'不正解');
-      fbx.appendChild(el('div','ftitle',(ok?'✓ ':'✕ ')+title+'　<span style="font-weight:600;font-size:12px;color:var(--muted)">正解：'+LETTERS[q.answer]+'</span>'));
+      fbx.appendChild(el('div','ftitle',(ok?'👍 ':'✕ ')+title+'　<span style="font-weight:600;font-size:12px;color:var(--muted)">正解：'+LETTERS[q.answer]+'</span>'));
       if(q.explanation) fbx.appendChild(el('div','exp',escapeHTML(q.explanation)));
       fb.appendChild(fbx);
       // 難易度ピッカー
