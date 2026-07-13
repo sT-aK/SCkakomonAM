@@ -71,7 +71,8 @@
   #app-root{font-family:var(--jp); color:var(--ink); background:var(--bg-grad); -webkit-font-smoothing:antialiased; line-height:1.6; position:fixed; top:0; left:0; right:0; bottom:0; display:flex; flex-direction:column; overflow:hidden; overscroll-behavior:none;}
   .stat,.panel,.qcard,.scorecard,.daylist{-webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur);}
   #app-root *{box-sizing:border-box;}
-  .wrap{flex:1; min-height:0; width:100%; max-width:760px; margin:0 auto; padding:14px 16px 24px; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:none;}
+  /* padding-bottom = 固定タブバー高さ + 安全領域。最下部コンテンツがタブバーに隠れないように */
+  .wrap{flex:1; min-height:0; width:100%; max-width:760px; margin:0 auto; padding:14px 16px calc(64px + env(safe-area-inset-bottom)); overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:none;}
   .topbar{flex:none; display:flex; align-items:center; gap:12px; padding:calc(env(safe-area-inset-top,0px) + 10px) max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left)); background:var(--tabbar-bg); -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur); border-bottom:1px solid var(--line);}
   .logo{font-weight:800; font-size:19px; letter-spacing:.02em;}
   .logo .dot{color:var(--primary);}
@@ -79,7 +80,10 @@
   .persist-note.warn{color:var(--due); border-color:var(--due-soft); background:var(--due-soft);}
   #syncNote{font-family:inherit; -webkit-appearance:none; appearance:none; cursor:pointer;}
   #syncNote:active{opacity:.7;}
-  .tabs{flex:none; display:flex; gap:6px; background:var(--tabbar-bg); -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur); border-top:1px solid var(--line); padding:6px max(10px,env(safe-area-inset-left)) calc(6px + env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-right)); box-shadow:0 -3px 16px rgba(20,18,30,.10);}
+  /* タブバーは画面最下部に固定。スタンドアロン(ツールバー無し)でも
+     bottom:0 が実端に付き、padding-bottom(safe-area)ぶんラベルを持ち上げつつ
+     背景はホームインジケータ領域まで途切れず続く。手動オフセット/モード分岐なし。 */
+  .tabs{position:fixed; left:0; right:0; bottom:0; z-index:50; max-width:760px; margin-inline:auto; display:flex; gap:6px; background:var(--tabbar-bg); -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur); border-top:1px solid var(--line); padding:6px max(10px,env(safe-area-inset-left)) calc(6px + env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-right)); box-shadow:0 -3px 16px rgba(20,18,30,.10);}
   .tab{flex:1; text-align:center; padding:11px 4px; border-radius:10px; font-size:13.5px; font-weight:600; color:var(--muted); cursor:pointer; border:none; background:transparent; font-family:inherit; transition:.15s;}
   .tab[aria-selected="true"]{background:var(--tab-on-bg); color:var(--tab-on-ink); box-shadow:var(--shadow);}
   .view{display:none;} .view.active{display:block;}
