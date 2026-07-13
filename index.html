@@ -539,7 +539,7 @@
     Object.values(progress).forEach(p=>p.attempts.forEach(a=>{answered++; if(a.ok)correct++;}));
 
     if(!questions.length){
-      v.appendChild(el('div','empty','<div class="big">📚</div><div>まだ問題がありません。<br>「問題管理」タブから JSON を取り込んでください。</div>'));
+      v.appendChild(el('div','empty','<div class="big">📚</div><div>まだ問題がありません。<br>通常は自動で読み込まれます。<br>別端末のデータは「問題管理」→クラウド同期、またはバックアップから復元できます。</div>'));
       return;
     }
     // トップにスコア（累計＋今日）を表示
@@ -976,6 +976,10 @@
     const actions=el('div'); actions.style.cssText='display:flex;gap:10px;flex-wrap:wrap;margin-top:14px';
     const ex=el('button','btn sec sm'); ex.textContent='エクスポート（バックアップ）';
     ex.addEventListener('click',exportAll); actions.appendChild(ex);
+    const imp=el('button','btn sec sm'); imp.textContent='バックアップから復元';
+    const fin=el('input'); fin.type='file'; fin.accept='application/json,.json'; fin.style.display='none';
+    fin.addEventListener('change',()=>{ if(fin.files&&fin.files[0]){ importBackup(fin.files[0]); fin.value=''; } });
+    imp.addEventListener('click',()=>fin.click()); actions.appendChild(imp); actions.appendChild(fin);
     const rs=el('button','btn danger sm'); rs.textContent='全データを削除';
     rs.addEventListener('click',resetAll); actions.appendChild(rs);
     sp.appendChild(actions);
@@ -1089,6 +1093,29 @@
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='sc_kakomon_backup.json'; a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href),2000);
     flash($('#smsg'),'good','エクスポートしました（画像・進捗を含む）。');
+  }
+  // バックアップJSON（またはエクスポート形式）から復元。進捗は時刻ユニオンでマージし、
+  // 既存の履歴を消さない。カスタム問題・画像も取り込む。
+  async function importBackup(file){
+    try{
+      const data=JSON.parse(await file.text());
+      const arr=Array.isArray(data)?data:(data.questions||[]);
+      let qres={added:0,updated:0};
+      if(arr.length) qres=await upsert(arr); // 画像も含めて取り込み
+      let pcount=0;
+      if(data.progress && typeof data.progress==='object'){
+        progress=mergeProgress(progress, data.progress);
+        pcount=Object.keys(data.progress).length;
+        await jset('kakomon:progress', progress);
+      }
+      if(data.difficulty && typeof data.difficulty==='object'){
+        Object.assign(difficulty, data.difficulty);
+        await jset('kakomon:difficulty', difficulty);
+      }
+      if(typeof schedulePush==='function') schedulePush();
+      renderManage();
+      flash($('#smsg'),'good','復元しました（問題 +'+qres.added+'/更新'+qres.updated+'、進捗 '+pcount+'件をマージ）。');
+    }catch(e){ console.error(e); flash($('#smsg'),'bad','復元に失敗しました。バックアップJSONを確認してください。'); }
   }
   async function resetAll(){
     if(!confirm('登録済みの問題と学習履歴をすべて削除します。よろしいですか？')) return;
