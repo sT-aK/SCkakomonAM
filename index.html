@@ -1134,7 +1134,9 @@
         if(window.firebase && firebase.auth && firebase.firestore){
           clearInterval(t);
           if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
-          resolve();
+          // セッションを端末に永続化（再起動後も自動復元）。iOSでIndexedDB不可でも
+          // 本体を止めないよう成否に関わらず resolve する。
+          firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){}).then(resolve);
         } else if(++n>100){ clearInterval(t); reject(new Error('Firebase load timeout')); }
       },100);
     });
@@ -1266,9 +1268,13 @@
     setSyncStatus(want?'reauth':'off');
     try{ await waitForFirebase(); }
     catch(e){ if(want) setSyncStatus('error'); return; } // SDK未達（オフライン等）でも本体は動かす
-    firebase.auth().getRedirectResult().then(r=>{
+    // リダイレクト認証の戻りを先に確定（失敗した環境では自動再認証を抑止）
+    let redirectFailed=false;
+    try{
+      const r=await firebase.auth().getRedirectResult();
       if(r && r.user){ try{ localStorage.setItem('kakomon:syncEnabled','1'); }catch(e){} }
-    }).catch(e=>console.error(e));
+    }catch(e){ redirectFailed=true; console.error(e); }
+    let first=true;
     firebase.auth().onAuthStateChanged(async u=>{
       fbUser=u;
       let w=false; try{ w=localStorage.getItem('kakomon:syncEnabled')==='1'; }catch(e){}
@@ -1276,7 +1282,18 @@
         syncEnabled=true;
         try{ await pullMergePush(); }
         catch(e){ console.error(e); setSyncStatus('error'); }
-      } else if(w){ setSyncStatus('reauth'); } // 同期ON設定だが未ログイン → ☁タップで再ログイン
+      } else if(w){
+        // 同期ON設定なのに未ログイン → 同意済みなら無操作でサイレント再認証（リダイレクト）。
+        // sessionStorageで1タブセッション1回に制限しループを防止。GitHub Pages等
+        // (プロキシの無いオリジン)では不意のリダイレクトを避けvercelドメイン限定。
+        let guarded=false; try{ guarded=sessionStorage.getItem('kakomon:autoAuth')==='1'; }catch(e){}
+        if(first && !guarded && !redirectFailed && location.hostname.endsWith('vercel.app')){
+          try{ sessionStorage.setItem('kakomon:autoAuth','1'); }catch(e){}
+          try{ await firebase.auth().signInWithRedirect(new firebase.auth.GoogleAuthProvider()); }
+          catch(e){ console.error(e); setSyncStatus('reauth'); }
+        } else { setSyncStatus('reauth'); } // ☁タップで手動再ログインも可
+      }
+      first=false;
     });
   }
   // アプリに戻ってきたタイミングで他端末の進捗を取り込む
