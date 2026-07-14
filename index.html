@@ -20,14 +20,14 @@
     --radius:16px; --blur:blur(14px);
     --jp:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic","Meiryo","Noto Sans JP",system-ui,sans-serif;
   }
-  /* スクロールは .wrap 内部に閉じ込める: ページ全体のラバーバンドで
-     背景の継ぎ目や html の単色が露出しないように（iOSは attachment:fixed 非対応）。
-     html にも同じグラデーションを敷き、万一の隙間も地色が馴染むようにする */
-  html,body{margin:0; padding:0; height:100%; overflow:hidden; overscroll-behavior:none;}
-  /* 地色（キャンバス色）はタブバーの見た目に合わせる。Safariの上下バー領域や
-     スタンドアロンでビューポート外に露出する帯がタブバーの続きに見えるように */
-  html{background:#edeaf8 linear-gradient(160deg,#0ea5a3 0%,#3b82f6 55%,#8b5cf6 100%);}
-  html.night{background:#191632 linear-gradient(160deg,#0b1120 0%,#1e1b4b 55%,#3b0764 100%);}
+  /* 標準のドキュメントスクロール構成（bodyがスクロール）。
+     iOSはページを固定(overflow:hidden+内部スクロール)にするとスタンドアロンで
+     ビューポートを実画面より短く計算するため、アプリシェル方式はやめる。
+     地色（キャンバス色）はバーと同色にしてあり、ラバーバンドや
+     Safariの上下バー領域もバーの続きに見える */
+  html,body{margin:0; padding:0;}
+  html{background:#edeaf8 linear-gradient(160deg,#0ea5a3 0%,#3b82f6 55%,#8b5cf6 100%) fixed;}
+  html.night{background:#191632 linear-gradient(160deg,#0b1120 0%,#1e1b4b 55%,#3b0764 100%) fixed;}
   /* 昼テーマ「オーロラ」（6〜17時） */
   #app-root{
     --bg-grad:linear-gradient(160deg,#0ea5a3 0%,#3b82f6 55%,#8b5cf6 100%);
@@ -64,19 +64,15 @@
     --on-grad:rgba(236,234,251,.8);
     --shadow:0 8px 24px rgba(0,0,0,.35);
   }
-  /* アプリシェル: ヘッダー / スクロール領域(.wrap) / フッター の3段フレックス。
-     top:0〜bottom:0 で常に画面(レイアウトビューポート)の実端まで張る。
-     高さをJSやvh/dvhで与えるとPWA起動状態やツールバー伸縮でズレるため、
-     4辺アンカーで固定するのが最も安定。安全領域はヘッダー/フッターの
-     padding(env(safe-area-inset-*))で吸収する。 */
-  #app-root{font-family:var(--jp); color:var(--ink); background:var(--bg-grad); -webkit-font-smoothing:antialiased; line-height:1.6; position:fixed; top:0; left:0; right:0; bottom:0; display:flex; flex-direction:column; overflow:hidden; overscroll-behavior:none;}
+  /* 背景グラデーションは html 側に一枚だけ描く（app-root には敷かない） */
+  #app-root{font-family:var(--jp); color:var(--ink); -webkit-font-smoothing:antialiased; line-height:1.6; min-height:100vh;}
   .stat,.panel,.qcard,.scorecard,.daylist{-webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur);}
   #app-root *{box-sizing:border-box;}
   /* padding-bottom = 固定タブバー高さ + 安全領域。最下部コンテンツがタブバーに隠れないように */
-  .wrap{flex:1; min-height:0; width:100%; max-width:760px; margin:0 auto; padding:14px 16px calc(64px + env(safe-area-inset-bottom)); overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:none;}
+  .wrap{max-width:760px; margin:0 auto; padding:14px 16px calc(64px + env(safe-area-inset-bottom));}
   /* 上下バーは不透明の同一色（--tabbar-bg）。OSが塗る帯(キャンバス色)と
      完全一致させ、ブラウザ/スタンドアロンどちらでも継ぎ目を出さない */
-  .topbar{flex:none; display:flex; align-items:center; gap:12px; padding:calc(env(safe-area-inset-top,0px) + 10px) max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left)); background:var(--tabbar-bg); border-bottom:1px solid var(--line);}
+  .topbar{position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:12px; padding:calc(env(safe-area-inset-top,0px) + 10px) max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left)); background:var(--tabbar-bg); border-bottom:1px solid var(--line);}
   .logo{font-weight:800; font-size:19px; letter-spacing:.02em;}
   .logo .dot{color:var(--primary);}
   .persist-note{margin-left:auto; font-size:11.5px; color:var(--muted); background:var(--card2); border:1px solid var(--line); padding:4px 9px; border-radius:999px;}
@@ -89,7 +85,6 @@
   .tabs{position:fixed; left:0; right:0; bottom:0; z-index:50; max-width:760px; margin-inline:auto; display:flex; gap:6px; background:var(--tabbar-bg); border-top:1px solid var(--line); padding:6px max(10px,env(safe-area-inset-left)) calc(6px + env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-right)); box-shadow:0 -3px 16px rgba(20,18,30,.10);}
   /* ビューポート下に帯が露出しても（iOSスタンドアロンの計算癖）タブバーの続きに見せる延長部 */
   .tabs::after{content:''; position:absolute; left:0; right:0; top:100%; height:150px; background:var(--tabbar-bg); pointer-events:none;}
-  .topbar{position:relative;}
   .topbar::before{content:''; position:absolute; left:0; right:0; bottom:100%; height:150px; background:var(--tabbar-bg); pointer-events:none;}
   .tab{flex:1; text-align:center; padding:11px 4px; border-radius:10px; font-size:13.5px; font-weight:600; color:var(--muted); cursor:pointer; border:none; background:transparent; font-family:inherit; transition:.15s;}
   .tab[aria-selected="true"]{background:var(--tab-on-bg); color:var(--tab-on-ink); box-shadow:var(--shadow);}
@@ -296,7 +291,6 @@
   };
   const SCHEMA_VERSION = 2; // v2: customImages を本体から分離し images/{qid} に保存
   const root = document.getElementById('app-root');
-  const wrap = root.querySelector('.wrap'); // 唯一のスクロールコンテナ
 
   // シェルの高さは CSS の top:0/bottom:0 固定に一本化（JSでの height 指定は廃止）。
 
@@ -464,7 +458,7 @@
     if(view==='study') renderStudy();
     if(view==='hist') renderHist();
     if(view==='manage') renderManage();
-    wrap.scrollTo(0,0);
+    window.scrollTo(0,0);
   }
   root.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>show(t.dataset.view)));
 
@@ -488,19 +482,8 @@
     }, {passive:true});
   })();
 
-  // ---------- documentへのバウンス防止（overscroll-behavior非対応iOSの保険） ----------
-  // スクローラが先頭/末尾のとき、さらに外へ引っ張るドラッグだけを止める。
-  (function(){
-    let y0=0;
-    root.addEventListener('touchstart', e=>{ if(e.touches.length===1) y0=e.touches[0].clientY; }, {passive:true});
-    root.addEventListener('touchmove', e=>{
-      if(e.touches.length!==1) return;
-      const dy=e.touches[0].clientY-y0;
-      const atTop=wrap.scrollTop<=0;
-      const atEnd=wrap.scrollTop+wrap.clientHeight>=wrap.scrollHeight-1;
-      if((atTop&&dy>0)||(atEnd&&dy<0)) e.preventDefault();
-    }, {passive:false});
-  })();
+  // documentスクロール構成に戻したため、バウンス抑止のtouchmoveガードは撤去。
+  // ラバーバンドで見える地色はバーと同色にしてあり自然に見える。
 
   // ---------- SCORE ----------
   // 採点ルール:
