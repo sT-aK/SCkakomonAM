@@ -26,8 +26,8 @@
   html,body{margin:0; padding:0; height:100%; overflow:hidden; overscroll-behavior:none;}
   /* 地色（キャンバス色）はタブバーの見た目に合わせる。Safariの上下バー領域や
      スタンドアロンでビューポート外に露出する帯がタブバーの続きに見えるように */
-  html{background:#d7b6fb linear-gradient(160deg,#0ea5a3 0%,#3b82f6 55%,#8b5cf6 100%);}
-  html.night{background:#240d43 linear-gradient(160deg,#0b1120 0%,#1e1b4b 55%,#3b0764 100%);}
+  html{background:#edeaf8 linear-gradient(160deg,#0ea5a3 0%,#3b82f6 55%,#8b5cf6 100%);}
+  html.night{background:#191632 linear-gradient(160deg,#0b1120 0%,#1e1b4b 55%,#3b0764 100%);}
   /* 昼テーマ「オーロラ」（6〜17時） */
   #app-root{
     --bg-grad:linear-gradient(160deg,#0ea5a3 0%,#3b82f6 55%,#8b5cf6 100%);
@@ -40,7 +40,7 @@
     --new:#2b6cb0; --new-soft:rgba(43,108,176,.15);
     --unk:#6d5ce0; --unk-soft:rgba(109,92,224,.15);
     --btn-bg:#ffffff; --btn-ink:#1d6fb8;
-    --tabbar-bg:rgba(255,255,255,.55); --tab-on-bg:#1d6fb8; --tab-on-ink:#fff;
+    --tabbar-bg:#edeaf8; --tab-on-bg:#1d6fb8; --tab-on-ink:#fff;
     --track:rgba(255,255,255,.55);
     --hero:rgba(255,255,255,.28); --hero-line:rgba(255,255,255,.5);
     --on-grad:rgba(255,255,255,.92);
@@ -58,7 +58,7 @@
     --new:#4a8ce0; --new-soft:rgba(74,140,224,.18);
     --unk:#a78bfa; --unk-soft:rgba(167,139,250,.18);
     --btn-bg:linear-gradient(135deg,#8be9fd,#a78bfa); --btn-ink:#141233;
-    --tabbar-bg:rgba(20,18,45,.6); --tab-on-bg:#6d5ce0; --tab-on-ink:#fff;
+    --tabbar-bg:#191632; --tab-on-bg:#6d5ce0; --tab-on-ink:#fff;
     --track:rgba(255,255,255,.14);
     --hero:rgba(255,255,255,.12); --hero-line:rgba(255,255,255,.22);
     --on-grad:rgba(236,234,251,.8);
@@ -74,7 +74,9 @@
   #app-root *{box-sizing:border-box;}
   /* padding-bottom = 固定タブバー高さ + 安全領域。最下部コンテンツがタブバーに隠れないように */
   .wrap{flex:1; min-height:0; width:100%; max-width:760px; margin:0 auto; padding:14px 16px calc(64px + env(safe-area-inset-bottom)); overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:none;}
-  .topbar{flex:none; display:flex; align-items:center; gap:12px; padding:calc(env(safe-area-inset-top,0px) + 10px) max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left)); background:var(--tabbar-bg); -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur); border-bottom:1px solid var(--line);}
+  /* 上下バーは不透明の同一色（--tabbar-bg）。OSが塗る帯(キャンバス色)と
+     完全一致させ、ブラウザ/スタンドアロンどちらでも継ぎ目を出さない */
+  .topbar{flex:none; display:flex; align-items:center; gap:12px; padding:calc(env(safe-area-inset-top,0px) + 10px) max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left)); background:var(--tabbar-bg); border-bottom:1px solid var(--line);}
   .logo{font-weight:800; font-size:19px; letter-spacing:.02em;}
   .logo .dot{color:var(--primary);}
   .persist-note{margin-left:auto; font-size:11.5px; color:var(--muted); background:var(--card2); border:1px solid var(--line); padding:4px 9px; border-radius:999px;}
@@ -84,7 +86,7 @@
   /* タブバーは画面最下部に固定。スタンドアロン(ツールバー無し)でも
      bottom:0 が実端に付き、padding-bottom(safe-area)ぶんラベルを持ち上げつつ
      背景はホームインジケータ領域まで途切れず続く。手動オフセット/モード分岐なし。 */
-  .tabs{position:fixed; left:0; right:0; bottom:0; z-index:50; max-width:760px; margin-inline:auto; display:flex; gap:6px; background:var(--tabbar-bg); -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur); border-top:1px solid var(--line); padding:6px max(10px,env(safe-area-inset-left)) calc(6px + env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-right)); box-shadow:0 -3px 16px rgba(20,18,30,.10);}
+  .tabs{position:fixed; left:0; right:0; bottom:0; z-index:50; max-width:760px; margin-inline:auto; display:flex; gap:6px; background:var(--tabbar-bg); border-top:1px solid var(--line); padding:6px max(10px,env(safe-area-inset-left)) calc(6px + env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-right)); box-shadow:0 -3px 16px rgba(20,18,30,.10);}
   /* ビューポート下に帯が露出しても（iOSスタンドアロンの計算癖）タブバーの続きに見せる延長部 */
   .tabs::after{content:''; position:absolute; left:0; right:0; top:100%; height:150px; background:var(--tabbar-bg); pointer-events:none;}
   .topbar{position:relative;}
@@ -304,7 +306,7 @@
     root.classList.toggle('night', night);
     document.documentElement.classList.toggle('night', night);
     const m=document.querySelector('meta[name="theme-color"]');
-    if(m) m.setAttribute('content', night?'#0b1120':'#0ea5a3');
+    if(m) m.setAttribute('content', night?'#191632':'#edeaf8'); // バー/キャンバス色と同一に
   }
   applyTheme(); setInterval(applyTheme, 60000);
   const $ = s => root.querySelector(s);
