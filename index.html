@@ -38,7 +38,7 @@
     --new:#2b6cb0; --new-soft:rgba(43,108,176,.15);
     --unk:#6d5ce0; --unk-soft:rgba(109,92,224,.15);
     --btn-bg:#ffffff; --btn-ink:#1d6fb8;
-    --tabbar-bg:rgba(255,255,255,.45); --tab-on-bg:#1d6fb8; --tab-on-ink:#fff;
+    --tabbar-bg:rgba(255,255,255,.18); --tab-on-bg:#1d6fb8; --tab-on-ink:#fff;
     --track:rgba(255,255,255,.55);
     --hero:rgba(255,255,255,.28); --hero-line:rgba(255,255,255,.5);
     --on-grad:rgba(255,255,255,.92);
@@ -56,22 +56,20 @@
     --new:#4a8ce0; --new-soft:rgba(74,140,224,.18);
     --unk:#a78bfa; --unk-soft:rgba(167,139,250,.18);
     --btn-bg:linear-gradient(135deg,#8be9fd,#a78bfa); --btn-ink:#141233;
-    --tabbar-bg:rgba(20,18,45,.5); --tab-on-bg:#6d5ce0; --tab-on-ink:#fff;
+    --tabbar-bg:rgba(20,18,45,.22); --tab-on-bg:#6d5ce0; --tab-on-ink:#fff;
     --track:rgba(255,255,255,.14);
     --hero:rgba(255,255,255,.12); --hero-line:rgba(255,255,255,.22);
     --on-grad:rgba(236,234,251,.8);
     --shadow:0 8px 24px rgba(0,0,0,.35);
   }
-  #app-root{font-family:var(--jp); color:var(--ink); -webkit-font-smoothing:antialiased; line-height:1.6; min-height:100vh;}
-  /* 全画面固定のグラデ層。緩いパン＋色相シフトで穏やかに変化（GPU合成で軽い）。
-     scale(1.15)のオーバースキャンでドリフト時も端が出ない。filterは擬似要素のみに効き本文は着色しない。 */
-  #app-root::before{content:''; position:fixed; inset:0; z-index:-1; pointer-events:none; background:var(--bg-grad); transform:scale(1.15); transform-origin:center; will-change:transform,filter; animation:bgLive 6s ease-in-out infinite;}
-  @keyframes bgLive{
-    0%{transform:scale(1.15) translate(0,0); filter:hue-rotate(-10deg);}
-    50%{transform:scale(1.15) translate(-3%,-2%); filter:hue-rotate(10deg);}
-    100%{transform:scale(1.15) translate(0,0); filter:hue-rotate(-10deg);}
-  }
-  @media (prefers-reduced-motion:reduce){ #app-root::before{animation:none; transform:none;} }
+  #app-root{font-family:var(--jp); color:var(--ink); -webkit-font-smoothing:antialiased; line-height:1.6; min-height:100vh; --bg-x:0; --bg-y:0; --bg-hue:0deg;}
+  /* 全画面固定のグラデ層。JS(下部の自己再帰ループ)がランダムな目標値を
+     --bg-x/--bg-y/--bg-hue にセットし、このtransitionで滑らかに遷移する
+     ことで周期性のないゆらぎを作る（GPU合成で軽い）。scale(1.15)の
+     オーバースキャンでドリフト時も端が出ない。filterは擬似要素のみに
+     効き本文は着色しない。 */
+  #app-root::before{content:''; position:fixed; inset:0; z-index:-1; pointer-events:none; background:var(--bg-grad); transform:scale(1.15) translate(var(--bg-x),var(--bg-y)); filter:hue-rotate(var(--bg-hue)); transform-origin:center; will-change:transform,filter; transition:transform 3s ease-in-out, filter 3s ease-in-out;}
+  @media (prefers-reduced-motion:reduce){ #app-root::before{transition:none;} }
   .stat,.panel,.qcard,.scorecard,.daylist{-webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur);}
   #app-root *{box-sizing:border-box;}
   /* padding-bottom = 固定タブバー高さ + 安全領域。最下部コンテンツがタブバーに隠れないように */
@@ -305,6 +303,21 @@
     if(m) m.setAttribute('content', night?'#0b1120':'#0ea5a3'); // グラデ上端色に合わせる
   }
   applyTheme(); setInterval(applyTheme, 60000);
+
+  // ---------- 背景のゆらぎ: 周期性のないランダムウォーク ----------
+  // 毎回の目標値・待ち時間とも独立乱数のため往復パターンが生じない。
+  // 1レグ約3秒（CSS側のtransition）で変化速度は一定に保つ。
+  (function(){
+    if(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    function tick(){
+      root.style.setProperty('--bg-x', (Math.random()*6-3).toFixed(2)+'%');       // -3%..3%
+      root.style.setProperty('--bg-y', (Math.random()*4-2).toFixed(2)+'%');       // -2%..2%
+      root.style.setProperty('--bg-hue', (Math.random()*20-10).toFixed(1)+'deg'); // -10..10deg
+      setTimeout(tick, 2600+Math.random()*800); // 2.6〜3.4秒。間隔自体も非周期に
+    }
+    tick();
+  })();
+
   const $ = s => root.querySelector(s);
   const el = (t,c,h)=>{const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e;};
   const DAY = 86400000;
