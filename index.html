@@ -26,10 +26,10 @@
   }
   /* 標準のドキュメントスクロール構成（bodyがスクロール）。
      背景グラデは #app-root::before の全画面固定レイヤーで描き、穏やかにアニメさせる。
-     html/body は単色フォールバック（レイヤーが覆うので通常は見えない）。 */
+     html は同じグラデの静的フォールバック（リペイント時に一瞬露出しても色が変わって見えない）。 */
   html,body{margin:0; padding:0;}
-  html{background:#3b82f6;}
-  html.night{background:#1e1b4b;}
+  html{background:linear-gradient(160deg,#0ea5a3 0%,#3b82f6 55%,#8b5cf6 100%);}
+  html.night{background:linear-gradient(160deg,#0b1120 0%,#1e1b4b 55%,#3b0764 100%);}
   /* 昼テーマ「オーロラ」（6〜17時） */
   #app-root{
     --bg-grad:linear-gradient(160deg,#0ea5a3 0%,#3b82f6 55%,#8b5cf6 100%);
@@ -99,9 +99,11 @@
   .tab{position:relative; z-index:1; flex:1; text-align:center; padding:11px 4px; border-radius:var(--radius-cap); font-size:13.5px; font-weight:600; color:var(--muted); cursor:pointer; border:none; background:transparent; font-family:inherit; transition:color var(--dur-fast) var(--ease-liquid);}
   .tab[aria-selected="true"]{color:var(--tab-on-ink);}
   .view{display:none;} .view.active{display:block;}
-  /* 画面切替のフェードイン（display:none→block で毎回再生される）。粘性系でゆっくりぬるっと */
+  /* 画面切替のスライド静定（display:none→block で毎回再生される）。粘性系でゆっくりぬるっと。
+     opacityはアニメしない: フェード中に背景グラデが露出して「背景色が切り替わる」ように見えるうえ、
+     opacity<1のビューはbackdrop-rootとなり内部ガラスのbackdrop-filterが背後を拾えなくなるため */
   .view.active{animation:viewIn var(--dur-med) var(--ease-liquid) both;}
-  @keyframes viewIn{from{opacity:0; transform:translateY(16px) scale(.985);} to{opacity:1; transform:none;}}
+  @keyframes viewIn{from{transform:translateY(16px) scale(.985);} to{transform:none;}}
   /* タップの触覚的フィードバック: 押下は速く沈み、戻りはぬるっと（極小の弾み付き） */
   .btn,.nextbtn,.dunno,.skipbtn,.seg button,.persist-note,.linkbtn{transition:transform var(--dur-fast) var(--ease-press), background .35s var(--ease-liquid), color .35s var(--ease-liquid), border-color .35s var(--ease-liquid), box-shadow .35s var(--ease-liquid), opacity .35s var(--ease-liquid), filter .35s var(--ease-liquid);}
   .startbtn:active,.nextbtn:active,.btn:active,.dunno:active{transform:translateY(1px) scale(.985); transition-duration:.15s;}
