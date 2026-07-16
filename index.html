@@ -222,6 +222,28 @@
   .feedback .ftitle{font-weight:800; margin-bottom:6px; display:flex; align-items:center; gap:8px;}
   .feedback.ok .ftitle{color:var(--ok);} .feedback.ng .ftitle{color:var(--ng);}
   .feedback .exp{white-space:pre-wrap; color:var(--ink);}
+  /* ---- AI解説チャット ---- */
+  .aibtn{margin-top:12px; width:100%; background:var(--card2); border:1.5px solid var(--primary); color:var(--primary); border-radius:16px; padding:11px; font-family:inherit; font-weight:700; font-size:14px; cursor:pointer;}
+  .aibtn:disabled{opacity:.5; cursor:default;}
+  .ai-panel{margin-top:12px; border:1px solid var(--line); border-radius:16px; background:var(--card2); padding:12px; box-shadow:var(--glass-edge);}
+  .ai-log{display:flex; flex-direction:column; gap:8px;}
+  .ai-msg{max-width:92%; border-radius:14px; padding:9px 12px; font-size:13.5px; line-height:1.65; word-break:break-word;}
+  .ai-msg.user{align-self:flex-end; background:var(--primary-soft); color:var(--ink); border:1px solid var(--line);}
+  .ai-msg.model{align-self:flex-start; max-width:100%; width:100%; background:var(--card); border:1px solid var(--line);}
+  .ai-msg.err{align-self:stretch; max-width:100%; background:var(--ng-soft); color:var(--ng); border:1px solid var(--ng-line); font-weight:600;}
+  .ai-msg h4{margin:10px 0 4px; font-size:13.5px;}
+  .ai-msg p{margin:6px 0;}
+  .ai-msg ul{margin:4px 0; padding-left:19px;}
+  .ai-msg li{margin:2px 0;}
+  .ai-msg code{background:var(--track); border-radius:5px; padding:1px 5px; font-size:12.5px;}
+  .ai-typing{opacity:.65;}
+  .ai-quick{display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;}
+  .ai-quick button{border:1.5px solid var(--line); background:var(--card2); color:var(--primary); border-radius:var(--radius-cap); padding:6px 12px; font-family:inherit; font-size:12px; font-weight:700; cursor:pointer;}
+  .ai-quick button:disabled{opacity:.5;}
+  .ai-inrow{display:flex; gap:7px; margin-top:9px;}
+  .ai-inrow input{flex:1; min-width:0;}
+  .ai-inrow .btn{flex:none;}
+  .ai-note{font-size:10.5px; color:var(--muted); margin-top:8px;}
   .nextbtn{margin-top:14px; width:100%; background:var(--btn-bg); color:var(--btn-ink); border:none; border-radius:var(--radius-cap); padding:14px; font-family:inherit; font-weight:700; font-size:15px; cursor:pointer; box-shadow:var(--shadow);}
   .empty{text-align:center; color:var(--on-grad); padding:40px 16px;}
   .empty .big{font-size:34px; margin-bottom:8px;}
@@ -838,6 +860,7 @@
       });
       updateDiffBtns();
       fb.appendChild(dr);
+      fb.appendChild(buildAiSection(q, ok, unknown, sel));
       const nb=el('button','nextbtn', session.single? '履歴に戻る' : (session.ids.length? '次の問題へ' : '結果を見る'));
       nb.addEventListener('click',()=>{ if(session&&session.single){ session=null; show('hist'); return; } $('#view-study').innerHTML=''; renderStudy(); });
       fb.appendChild(nb);
@@ -997,6 +1020,26 @@
     gp.appendChild(ghelp);
     v.appendChild(gp);
 
+    // AI解説（Gemini・BYOK）設定
+    const ap=el('div','panel'); ap.appendChild(el('h3',null,'AI解説（Gemini）','<small>回答後にAIが詳しく解説</small>'));
+    const krow=el('div'); krow.style.cssText='display:flex;gap:8px;flex-wrap:wrap';
+    const kin=el('input'); kin.type='password'; kin.placeholder='Gemini APIキーを貼り付け'; kin.value=aiKey||''; kin.style.flex='1'; kin.style.minWidth='180px'; kin.autocomplete='off';
+    const ksave=el('button','btn sm','保存');
+    const amsg=el('div','msg');
+    ksave.addEventListener('click',async()=>{ aiKey=kin.value.trim(); await jset('kakomon:aiKey', aiKey); flash(amsg,'good', aiKey?'APIキーを保存しました。':'APIキーを削除しました。'); });
+    krow.appendChild(kin); krow.appendChild(ksave); ap.appendChild(krow);
+    const aseg=el('div','seg'); aseg.style.margin='10px 0 0';
+    Object.entries(AI_MODELS).forEach(([id,label])=>{
+      const b=el('button',null,label); b.setAttribute('aria-pressed', String(aiModel===id));
+      b.addEventListener('click',async()=>{ aiModel=id; await jset('kakomon:aiModel', id); aseg.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed','false')); b.setAttribute('aria-pressed','true'); });
+      aseg.appendChild(b);
+    });
+    ap.appendChild(aseg);
+    const ahelp=el('div','mini'); ahelp.style.marginTop='8px';
+    ahelp.innerHTML='キーは <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="color:var(--primary)">Google AI Studio</a> で無料取得できます。キーはこの端末にのみ保存され、同期・バックアップには含まれません。AIの解説は誤りを含むことがあります。';
+    ap.appendChild(ahelp); ap.appendChild(amsg);
+    v.appendChild(ap);
+
     // current data summary + export/reset + browse
     const sp=el('div','panel'); sp.appendChild(el('h3',null,'登録済みの問題','<small>'+questions.length+' 問</small>'));
     const byYear={}; questions.forEach(q=>{byYear[q.year||'—']=(byYear[q.year||'—']||0)+1;});
@@ -1154,7 +1197,7 @@
   }
   async function resetAll(){
     if(!confirm('登録済みの問題と学習履歴をすべて削除します。よろしいですか？')) return;
-    for(const q of questions){ if(q.hasImage) await jdel('kakomon:img:'+q.id); }
+    for(const q of questions){ if(q.hasImage) await jdel('kakomon:img:'+q.id); await jdel('kakomon:ai:'+q.id); }
     questions=[]; progress={}; session=null;
     Object.keys(imgCache).forEach(k=>delete imgCache[k]);
     await jset('kakomon:questions', questions); await jset('kakomon:progress', progress);
@@ -1347,6 +1390,151 @@
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && syncEnabled) schedulePush(); });
   // ================= /Firebase Sync =================
 
+  // ================= AI解説（Gemini・BYOK） =================
+  // キーはユーザー自身が Google AI Studio で取得し、この端末にのみ保存（同期・バックアップ対象外）。
+  // 会話キャッシュは kakomon:ai:<qid> にローカル保存し、同期ON時は users/{uid}/ai/{qid} にも保存。
+  const AI_MODELS={'gemini-2.5-flash':'2.5 Flash（高品質）','gemini-2.5-flash-lite':'2.5 Flash-Lite（軽量）'};
+  let aiKey='', aiModel='gemini-2.5-flash';
+  const AI_SYS='あなたは情報処理安全確保支援士（SC）試験の熟練講師です。受験者が過去問を深く理解できるよう、日本語で分かりやすく解説してください。\n最初の解説依頼には次の構成で答えてください:\n## 正解と要点\n## 各選択肢の解説（ア〜エそれぞれが正しい/誤りである理由）\n## キーワード解説（問題文や選択肢の重要用語を簡潔に）\n計算・論理式・数式変形・進数変換・確率などを含む問題では、途中式や変形過程を省略せず、番号付きのステップで順を追って解説してください。\n追加質問にはその質問に絞って簡潔に答えてください。装飾は太字・箇条書き・見出し（##）程度にとどめ、表やHTMLは使わないでください。';
+  function aiRef(id){ return firebase.firestore().doc('users/'+fbUser.uid+'/ai/'+id); }
+  async function aiCacheGet(qid){
+    let c=await jget('kakomon:ai:'+qid, null);
+    if(!c && syncEnabled && fbUser){
+      try{ const s=await aiRef(qid).get(); if(s.exists){ c=s.data(); await jset('kakomon:ai:'+qid, c); } }catch(e){ console.warn('ai pull failed', e); }
+    }
+    return (c && Array.isArray(c.messages) && c.messages.length) ? c : null;
+  }
+  async function aiCacheSet(qid, messages){
+    const c={messages, model:aiModel, updatedAt:Date.now()};
+    await jset('kakomon:ai:'+qid, c);
+    if(syncEnabled && fbUser){
+      try{ if(JSON.stringify(c).length<=900000) aiRef(qid).set(c).catch(e=>console.warn('ai push failed', e)); }catch(e){}
+    }
+  }
+  // AI応答の簡易Markdown描画。全文をescapeHTMLしてから太字・見出し・箇条書き・codeのみ変換（XSS安全）
+  function mdLite(t){
+    const inline=s=>s.replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
+    const out=[]; let ul=false;
+    for(const ln of escapeHTML(t).split('\n')){
+      const li=ln.match(/^\s*[-*・]\s+(.*)/);
+      if(li){ if(!ul){out.push('<ul>'); ul=true;} out.push('<li>'+inline(li[1])+'</li>'); continue; }
+      if(ul){ out.push('</ul>'); ul=false; }
+      const h=ln.match(/^\s*#{1,4}\s+(.*)/);
+      if(h){ out.push('<h4>'+inline(h[1])+'</h4>'); continue; }
+      if(ln.trim()===''){ out.push('<div style="height:5px"></div>'); continue; }
+      out.push('<p>'+inline(ln)+'</p>');
+    }
+    if(ul) out.push('</ul>');
+    return out.join('');
+  }
+  // 問題コンテキスト（初回ターン）。画像付き問題は inline_data で画像も添付。
+  async function aiContextParts(q, resultLabel){
+    const t='【試験】情報処理安全確保支援士試験 午前I'+(q.exam?('（'+q.exam+'）'):'')+'\n【分類】'+(q.category||'—')
+      +(q.calc?'\n【注意】これは計算問題です。必ず計算過程をステップバイステップで示してください。':'')
+      +'\n【問題文】\n'+q.question
+      +'\n【選択肢】\n'+q.choices.map((c,i)=>LETTERS[i]+'．'+c).join('\n')
+      +'\n【正解】'+LETTERS[q.answer]
+      +(q.explanation?('\n【手持ちの解説】\n'+q.explanation):'')
+      +(resultLabel?('\n【受験者の回答】'+resultLabel):'')
+      +'\n\nこの問題を解説してください。';
+    const parts=[];
+    if(q.hasImage){
+      const d=await loadImage(q.id);
+      const m=d&&d.match(/^data:(image\/[\w.+-]+);base64,(.+)$/s);
+      if(m) parts.push({inline_data:{mime_type:m[1], data:m[2]}});
+    }
+    parts.push({text:t});
+    return parts;
+  }
+  // ストリーミング呼び出し（SSE）。onDelta にはその時点までの全文を渡す。
+  async function aiCall(contents, onDelta){
+    const url='https://generativelanguage.googleapis.com/v1beta/models/'+aiModel+':streamGenerateContent?alt=sse';
+    const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':aiKey},body:JSON.stringify({system_instruction:{parts:[{text:AI_SYS}]}, contents})});
+    if(!res.ok){
+      let msg='AIの呼び出しに失敗しました（HTTP '+res.status+'）。';
+      if(res.status===429) msg='無料枠の上限に達した可能性があります。時間を置くか、問題管理タブでFlash-Liteに切り替えてください。';
+      else if(res.status===400||res.status===401||res.status===403) msg='APIキーが無効の可能性があります。問題管理タブの設定を確認してください。';
+      throw new Error(msg);
+    }
+    const rd=res.body.getReader(); const dec=new TextDecoder(); let buf='', full='';
+    while(true){
+      const {done,value}=await rd.read(); if(done) break;
+      buf+=dec.decode(value,{stream:true});
+      const lines=buf.split('\n'); buf=lines.pop();
+      for(const ln of lines){
+        if(!ln.startsWith('data:')) continue;
+        const js=ln.slice(5).trim(); if(!js) continue;
+        try{
+          const o=JSON.parse(js);
+          const ps=(((o.candidates||[])[0]||{}).content||{}).parts;
+          if(Array.isArray(ps)) ps.forEach(p=>{ if(p.text){ full+=p.text; onDelta(full); } });
+        }catch(e){}
+      }
+    }
+    if(!full) throw new Error('AIから応答がありませんでした。もう一度お試しください。');
+    return full;
+  }
+  // 回答後のフィードバック欄に差し込むAIセクション（回答後のみ表示＝ネタバレ無し）
+  function buildAiSection(q, ok, unknown, sel){
+    const box=el('div');
+    const btn=el('button','aibtn','🤖 AIに詳しく聞く');
+    btn.addEventListener('click', async()=>{
+      btn.disabled=true;
+      if(!aiKey){
+        const w=el('div','ai-panel');
+        w.appendChild(el('div','ai-note','AI解説を使うには Gemini APIキーの設定が必要です（無料で取得できます）。'));
+        const go=el('button','btn sec sm','設定を開く'); go.style.marginTop='8px';
+        go.addEventListener('click',()=>show('manage'));
+        w.appendChild(go); box.appendChild(w); btn.remove(); return;
+      }
+      const panel=await buildAiPanel(q, ok, unknown, sel);
+      box.appendChild(panel); btn.remove();
+      panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+    });
+    box.appendChild(btn);
+    return box;
+  }
+  async function buildAiPanel(q, ok, unknown, sel){
+    const panel=el('div','ai-panel');
+    const log=el('div','ai-log'); panel.appendChild(log);
+    const quick=el('div','ai-quick');
+    const qBtns=['もっと詳しく','キーワードを解説','もっと簡単に','覚え方のコツ'].map(t=>{ const b=el('button',null,t); quick.appendChild(b); return b; });
+    const regen=el('button',null,'再生成'); quick.appendChild(regen);
+    const inrow=el('div','ai-inrow');
+    const inp=el('input'); inp.type='text'; inp.placeholder='追加で質問する…'; inp.autocomplete='off';
+    const send=el('button','btn sm','送信');
+    inrow.appendChild(inp); inrow.appendChild(send);
+    panel.appendChild(quick); panel.appendChild(inrow);
+    panel.appendChild(el('div','ai-note','AIの解説は誤りを含むことがあります。モデル: '+(AI_MODELS[aiModel]||aiModel)));
+    let messages=[], busy=false;
+    const resultLabel = unknown ? '「分からない」を選択' : (ok ? '正解（'+LETTERS[sel]+'）' : '不正解（'+LETTERS[sel]+'を選択）');
+    function addMsg(cls, html){ const m=el('div','ai-msg '+cls); m.innerHTML=html; log.appendChild(m); return m; }
+    function renderAll(){ log.innerHTML=''; messages.forEach(m=>addMsg(m.role==='user'?'user':'model', m.role==='user'?escapeHTML(m.text):mdLite(m.text))); }
+    function setBusy(b){ busy=b; [send,regen].concat(qBtns).forEach(x=>x.disabled=b); }
+    async function run(userMsg){
+      if(busy) return; setBusy(true);
+      if(userMsg){ messages.push({role:'user',text:userMsg}); renderAll(); }
+      const mm=addMsg('model ai-typing','…');
+      try{
+        const ctxTurn={role:'user', parts: await aiContextParts(q, resultLabel)};
+        const hist=messages.slice(-24).map(m=>({role:m.role==='user'?'user':'model', parts:[{text:m.text}]}));
+        const full=await aiCall([ctxTurn].concat(hist), t=>{ mm.innerHTML=mdLite(t); });
+        messages.push({role:'model',text:full});
+        renderAll();
+        aiCacheSet(q.id, messages);
+      }catch(e){ mm.className='ai-msg err'; mm.textContent=(e&&e.message)||String(e); }
+      setBusy(false);
+    }
+    regen.addEventListener('click',()=>{ if(busy) return; messages=[]; renderAll(); run(null); });
+    qBtns.forEach(b=>b.addEventListener('click',()=>run(b.textContent)));
+    send.addEventListener('click',()=>{ const t=inp.value.trim(); if(t && !busy){ inp.value=''; run(t); } });
+    inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); send.click(); } });
+    const cached=await aiCacheGet(q.id);
+    if(cached){ messages=cached.messages; renderAll(); }
+    else run(null);
+    return panel;
+  }
+
   // ---------- boot ----------
   (async function init(){
     $('#syncNote').addEventListener('click', onSyncNoteClick);
@@ -1355,6 +1543,9 @@
     // 旧スキーマ(固定間隔)からの移行: 履歴から ivl/ef/due 等を再計算
     Object.values(progress).forEach(p=>{ if(p&&p.attempts) Object.assign(p, sched(p.attempts)); });
     difficulty = await jget('kakomon:difficulty', {});
+    aiKey = await jget('kakomon:aiKey', '');
+    aiModel = await jget('kakomon:aiModel', 'gemini-2.5-flash');
+    if(!AI_MODELS[aiModel]) aiModel='gemini-2.5-flash';
     // ensure shape
     questions.forEach(q=>{ if(q.hasImage===undefined) q.hasImage=false; if(q.calc===undefined) q.calc=isCalcQ(q.id, q); });
 
