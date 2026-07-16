@@ -1036,7 +1036,7 @@
     });
     ap.appendChild(aseg);
     const ahelp=el('div','mini'); ahelp.style.marginTop='8px';
-    ahelp.innerHTML='キーは <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="color:var(--primary)">Google AI Studio</a> で無料取得できます。キーはこの端末にのみ保存され、同期・バックアップには含まれません。AIの解説は誤りを含むことがあります。';
+    ahelp.innerHTML='キーは <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="color:var(--primary)">Google AI Studio</a> で無料取得できます。キーはこの端末にのみ保存され、同期・バックアップには含まれません。モデルは常に最新版に自動追従します。AIの解説は誤りを含むことがあります。';
     ap.appendChild(ahelp); ap.appendChild(amsg);
     v.appendChild(ap);
 
@@ -1393,8 +1393,10 @@
   // ================= AI解説（Gemini・BYOK） =================
   // キーはユーザー自身が Google AI Studio で取得し、この端末にのみ保存（同期・バックアップ対象外）。
   // 会話キャッシュは kakomon:ai:<qid> にローカル保存し、同期ON時は users/{uid}/ai/{qid} にも保存。
-  const AI_MODELS={'gemini-2.5-flash':'2.5 Flash（高品質）','gemini-2.5-flash-lite':'2.5 Flash-Lite（軽量）'};
-  let aiKey='', aiModel='gemini-2.5-flash';
+  // モデルは固定バージョンIDではなく常に最新版を指す公式エイリアスを使う
+  // （固定IDは提供終了で404になるため。例: gemini-2.5-flash は2026年に廃止）
+  const AI_MODELS={'gemini-flash-latest':'Flash（高品質）','gemini-flash-lite-latest':'Flash-Lite（軽量・高速）'};
+  let aiKey='', aiModel='gemini-flash-latest';
   const AI_SYS='あなたは情報処理安全確保支援士（SC）試験の熟練講師です。受験者が過去問を深く理解できるよう、日本語で分かりやすく解説してください。\n最初の解説依頼には次の構成で答えてください:\n## 正解と要点\n## 各選択肢の解説（ア〜エそれぞれが正しい/誤りである理由）\n## キーワード解説（問題文や選択肢の重要用語を簡潔に）\n計算・論理式・数式変形・進数変換・確率などを含む問題では、途中式や変形過程を省略せず、番号付きのステップで順を追って解説してください。\n追加質問にはその質問に絞って簡潔に答えてください。装飾は太字・箇条書き・見出し（##）程度にとどめ、表やHTMLは使わないでください。';
   function aiRef(id){ return firebase.firestore().doc('users/'+fbUser.uid+'/ai/'+id); }
   async function aiCacheGet(qid){
@@ -1451,10 +1453,12 @@
     const url='https://generativelanguage.googleapis.com/v1beta/models/'+aiModel+':streamGenerateContent?alt=sse';
     const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':aiKey},body:JSON.stringify({system_instruction:{parts:[{text:AI_SYS}]}, contents})});
     if(!res.ok){
+      let detail=''; try{ const eo=JSON.parse(await res.text()); if(eo&&eo.error&&eo.error.message) detail='\n詳細: '+eo.error.message; }catch(e){}
       let msg='AIの呼び出しに失敗しました（HTTP '+res.status+'）。';
       if(res.status===429) msg='無料枠の上限に達した可能性があります。時間を置くか、問題管理タブでFlash-Liteに切り替えてください。';
+      else if(res.status===404) msg='モデルが見つかりません（提供終了の可能性）。問題管理タブでモデルを切り替えてください。';
       else if(res.status===400||res.status===401||res.status===403) msg='APIキーが無効の可能性があります。問題管理タブの設定を確認してください。';
-      throw new Error(msg);
+      throw new Error(msg+detail);
     }
     const rd=res.body.getReader(); const dec=new TextDecoder(); let buf='', full='';
     while(true){
@@ -1544,8 +1548,8 @@
     Object.values(progress).forEach(p=>{ if(p&&p.attempts) Object.assign(p, sched(p.attempts)); });
     difficulty = await jget('kakomon:difficulty', {});
     aiKey = await jget('kakomon:aiKey', '');
-    aiModel = await jget('kakomon:aiModel', 'gemini-2.5-flash');
-    if(!AI_MODELS[aiModel]) aiModel='gemini-2.5-flash';
+    aiModel = await jget('kakomon:aiModel', 'gemini-flash-latest');
+    if(!AI_MODELS[aiModel]) aiModel='gemini-flash-latest'; // 旧固定ID保存値からの自動移行を含む
     // ensure shape
     questions.forEach(q=>{ if(q.hasImage===undefined) q.hasImage=false; if(q.calc===undefined) q.calc=isCalcQ(q.id, q); });
 
