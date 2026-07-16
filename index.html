@@ -1448,17 +1448,20 @@
     parts.push({text:t});
     return parts;
   }
-  // ストリーミング呼び出し（SSE）。onDelta にはその時点までの全文を渡す。
-  async function aiCall(contents, onDelta){
-    const url='https://generativelanguage.googleapis.com/v1beta/models/'+aiModel+':streamGenerateContent?alt=sse';
+  // ストリーミング呼び出し1回分（SSE）。onDelta にはその時点までの全文を渡す。
+  async function aiCallOnce(model, contents, onDelta){
+    const url='https://generativelanguage.googleapis.com/v1beta/models/'+model+':streamGenerateContent?alt=sse';
     const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':aiKey},body:JSON.stringify({system_instruction:{parts:[{text:AI_SYS}]}, contents})});
     if(!res.ok){
       let detail=''; try{ const eo=JSON.parse(await res.text()); if(eo&&eo.error&&eo.error.message) detail='\n詳細: '+eo.error.message; }catch(e){}
       let msg='AIの呼び出しに失敗しました（HTTP '+res.status+'）。';
       if(res.status===429) msg='無料枠の上限に達した可能性があります。時間を置くか、問題管理タブでFlash-Liteに切り替えてください。';
       else if(res.status===404) msg='モデルが見つかりません（提供終了の可能性）。問題管理タブでモデルを切り替えてください。';
+      else if(res.status===503||res.status===500||res.status===504) msg='モデルが混雑しています。時間を置いて再試行するか、問題管理タブでFlash-Liteに切り替えてください。';
       else if(res.status===400||res.status===401||res.status===403) msg='APIキーが無効の可能性があります。問題管理タブの設定を確認してください。';
-      throw new Error(msg+detail);
+      const err=new Error(msg+detail);
+      err.retryable=(res.status===503||res.status===500||res.status===504); // 一時的な過負荷のみ再試行対象
+      throw err;
     }
     const rd=res.body.getReader(); const dec=new TextDecoder(); let buf='', full='';
     while(true){
@@ -1477,6 +1480,20 @@
     }
     if(!full) throw new Error('AIから応答がありませんでした。もう一度お試しください。');
     return full;
+  }
+  // 混雑(503等)時は数秒待って再試行し、それでもダメなら軽量なFlash-Liteへ自動フォールバック。
+  // onStatus には再試行中のユーザー向け状況テキストを渡す。
+  async function aiCall(contents, onDelta, onStatus){
+    const lite='gemini-flash-lite-latest';
+    const plan=[{m:aiModel,wait:0,note:''},{m:aiModel,wait:2500,note:'混雑のため数秒後に再試行します…'}];
+    if(aiModel!==lite) plan.push({m:lite,wait:2500,note:'混雑が続くためFlash-Liteで再試行します…'});
+    let lastErr=null;
+    for(const st of plan){
+      if(st.wait){ if(onStatus) onStatus(st.note); await new Promise(r=>setTimeout(r,st.wait)); }
+      try{ return await aiCallOnce(st.m, contents, onDelta); }
+      catch(e){ lastErr=e; if(!e.retryable) throw e; }
+    }
+    throw lastErr;
   }
   // 回答後のフィードバック欄に差し込むAIセクション（回答後のみ表示＝ネタバレ無し）
   function buildAiSection(q, ok, unknown, sel){
@@ -1522,7 +1539,7 @@
       try{
         const ctxTurn={role:'user', parts: await aiContextParts(q, resultLabel)};
         const hist=messages.slice(-24).map(m=>({role:m.role==='user'?'user':'model', parts:[{text:m.text}]}));
-        const full=await aiCall([ctxTurn].concat(hist), t=>{ mm.innerHTML=mdLite(t); });
+        const full=await aiCall([ctxTurn].concat(hist), t=>{ mm.innerHTML=mdLite(t); }, s=>{ mm.textContent=s; });
         messages.push({role:'model',text:full});
         renderAll();
         aiCacheSet(q.id, messages);
