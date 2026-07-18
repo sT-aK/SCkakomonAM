@@ -457,9 +457,11 @@
     if(p.due<=now){ return p.attempts[p.attempts.length-1].ok ? 2 : 1; } // due復習 / due前回不正解
     return 3;                                        // 未来(期限前)
   }
+  const secLabel = s => (s==='午前2' ? '午前II' : '午前I');  // section値(算用数字)→表示(ローマ数字)
   function matchFilter(q,f){
     if(!f) return true;
-    if(f.section && q.section!==f.section) return false;
+    if(f.section && (q.section||'午前1')!==f.section) return false;
+    if(f.sections && f.sections.length && f.sections.indexOf(q.section||'午前1')<0) return false;
     if(f.year && q.year!==f.year) return false;
     if(f.category && q.category!==f.category) return false;
     if(f.categories && f.categories.length && f.categories.indexOf(q.category)<0) return false;
@@ -628,15 +630,18 @@
     p.appendChild(rec);
     v.appendChild(p);
 
-    // by year
-    const years=[...new Set(questions.map(q=>q.year))].filter(Boolean);
-    if(years.length){
+    // by year × section
+    const pairs=[];
+    questions.forEach(q=>{ if(q.year){ const s=q.section||'午前1'; const k=q.year+'\t'+s; if(!pairs.includes(k)) pairs.push(k); } });
+    if(pairs.length){
       const yp=el('div','panel'); yp.appendChild(el('h3',null,'年度別に学習','<small>全問を忘却曲線順で</small>'));
       const g=el('div','startgrid');
-      years.forEach(y=>{
-        const cnt=questions.filter(q=>q.year===y).length;
-        const b=el('button','startbtn ghost', y+'<small>'+cnt+'問</small>');
-        b.addEventListener('click',()=>startSession({year:y}, true, y));
+      pairs.forEach(k=>{
+        const [y,s]=k.split('\t');
+        const label=y+' '+secLabel(s);
+        const cnt=questions.filter(q=>q.year===y && (q.section||'午前1')===s).length;
+        const b=el('button','startbtn ghost', label+'<small>'+cnt+'問</small>');
+        b.addEventListener('click',()=>startSession({year:y, section:s}, true, label));
         g.appendChild(b);
       });
       yp.appendChild(g); v.appendChild(yp);
@@ -676,6 +681,18 @@
       cp.appendChild(calcG);
       cp.appendChild(selBar([calcYesChip, calcNoChip]));
 
+      // 区分（午前I／II）— 複数の区分が存在するときだけ表示
+      const secs=[...new Set(questions.map(q=>q.section||'午前1'))];
+      secs.sort();  // '午前1' < '午前2'
+      const secChips={};
+      if(secs.length>1){
+        cp.appendChild(el('div','subhead','区分（午前I／II）'));
+        const secG=el('div','chkgrid');
+        secs.forEach(s=>{ const cnt=questions.filter(q=>(q.section||'午前1')===s).length; secChips[s]=chip(secG, s, secLabel(s), cnt, true); });
+        cp.appendChild(secG);
+        cp.appendChild(selBar(Object.values(secChips)));
+      }
+
       cp.appendChild(el('div','subhead','難易度'));
       const diffG=el('div','chkgrid'); diffG.style.gridTemplateColumns='repeat(2,1fr)';
       const diffChips={};
@@ -696,12 +713,17 @@
         const dsel=Object.keys(diffChips).filter(v=>diffChips[v].classList.contains('on'));
         // 全4つ選択中はフィルタなし（diffs=null）
         const diffs=(dsel.length===4||dsel.length===0)?null:dsel;
-        return {categories:sc, calc, yes, no, diffs, dsel};
+        // 区分: 全ON（＝存在する区分すべて）または全OFFは制限なし（sections=null）
+        const ssel=Object.keys(secChips).filter(s=>secChips[s].classList.contains('on'));
+        const secKeys=Object.keys(secChips);
+        const sections=(secKeys.length===0||ssel.length===secKeys.length||ssel.length===0)?null:ssel;
+        return {categories:sc, calc, yes, no, diffs, dsel, sections, ssel, secKeys};
       }
-      function matchCount(f){ return questions.filter(q=>matchFilter(q,{categories:f.categories, calc:f.calc, diffs:f.diffs})).length; }
+      function matchCount(f){ return questions.filter(q=>matchFilter(q,{categories:f.categories, calc:f.calc, diffs:f.diffs, sections:f.sections})).length; }
       function updateCount(){
         const f=selected();
-        const n=(!f.categories.length || (!f.yes&&!f.no) || f.dsel.length===0) ? 0 : matchCount(f);
+        const secBad=(f.secKeys.length>0 && f.ssel.length===0);
+        const n=(!f.categories.length || (!f.yes&&!f.no) || f.dsel.length===0 || secBad) ? 0 : matchCount(f);
         startB.innerHTML='選択した区分で学習<small>'+n+' 問</small>';
         startB.disabled=(n===0);
       }
@@ -710,10 +732,12 @@
         if(!f.categories.length){ flash(cmsg,'bad','分類を1つ以上選択してください。'); return; }
         if(!f.yes&&!f.no){ flash(cmsg,'bad','「計算問題」「計算以外」のいずれかを選択してください。'); return; }
         if(!f.dsel.length){ flash(cmsg,'bad','難易度を1つ以上選択してください。'); return; }
+        if(f.secKeys.length>0 && f.ssel.length===0){ flash(cmsg,'bad','「午前I」「午前II」のいずれかを選択してください。'); return; }
         const diffLab=f.diffs ? '・'+(f.diffs.map(d=>DIFF_META[d]?DIFF_META[d].l:'未設定').join('/')) : '';
+        const secLab=f.sections ? '・'+f.sections.map(secLabel).join('/') : '';
         const lab=(f.categories.length===cats.length?'全分類':(f.categories.length===1?f.categories[0]:f.categories.length+'分類'))
-          + (f.calc==='yes'?'・計算':f.calc==='no'?'・計算以外':'') + diffLab;
-        startSession({categories:f.categories, calc:f.calc, diffs:f.diffs}, true, lab);
+          + secLab + (f.calc==='yes'?'・計算':f.calc==='no'?'・計算以外':'') + diffLab;
+        startSession({categories:f.categories, calc:f.calc, diffs:f.diffs, sections:f.sections}, true, lab);
       });
       updateCount();
       v.appendChild(cp);
@@ -982,11 +1006,12 @@
     v.appendChild(rp);
 
     v.appendChild(breakdownPanel('分類別の正答率', 'category', atts));
-    v.appendChild(breakdownPanel('年度別の正答率', 'year', atts));
+    v.appendChild(breakdownPanel('年度別の正答率', q=>q.year?q.year+' '+secLabel(q.section):null, atts));
   }
   function breakdownPanel(title, key, atts){
+    const kf = typeof key==='function' ? key : (q=>q[key]);
     const m={};
-    atts.forEach(({q,a})=>{ const g=q[key]||'—'; if(!m[g])m[g]={t:0,c:0}; m[g].t++; if(a.ok&&!a.unknown)m[g].c++; });
+    atts.forEach(({q,a})=>{ const g=kf(q)||'—'; if(!m[g])m[g]={t:0,c:0}; m[g].t++; if(a.ok&&!a.unknown)m[g].c++; });
     const keys=Object.keys(m).sort((x,y)=> (m[x].c/m[x].t) - (m[y].c/m[y].t));
     const p=el('div','panel'); p.appendChild(el('h3',null,title));
     keys.forEach(g=>{
@@ -1042,8 +1067,8 @@
 
     // current data summary + export/reset + browse
     const sp=el('div','panel'); sp.appendChild(el('h3',null,'登録済みの問題','<small>'+questions.length+' 問</small>'));
-    const byYear={}; questions.forEach(q=>{byYear[q.year||'—']=(byYear[q.year||'—']||0)+1;});
-    Object.keys(byYear).forEach(y=>{
+    const byYear={}; questions.forEach(q=>{const k=q.year?q.year+' '+secLabel(q.section):'—'; byYear[k]=(byYear[k]||0)+1;});
+    Object.keys(byYear).sort().forEach(y=>{
       const row=el('div','secrow'); row.appendChild(el('div','secname',y));
       row.appendChild(el('div',null,'')); row.lastChild.style.flex='1';
       row.appendChild(el('div','barval', byYear[y]+' 問'));
