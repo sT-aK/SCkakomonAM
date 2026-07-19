@@ -90,8 +90,21 @@
   .logo .dot{color:var(--primary);}
   .persist-note{margin-left:auto; font-size:11.5px; color:var(--muted); background:var(--card2); border:1px solid var(--line); padding:4px 9px; border-radius:999px;}
   .persist-note.warn{color:var(--due); border-color:var(--due-soft); background:var(--due-soft);}
-  #syncNote{font-family:inherit; -webkit-appearance:none; appearance:none; cursor:pointer;}
-  #syncNote:active{opacity:.7;}
+  /* 右上のアカウントアイコン（Googleログイン時はプロフィール画像）。タップで設定画面を開く */
+  .profile-btn{margin-left:auto; position:relative; width:38px; height:38px; flex:none; padding:0; border:1px solid var(--glass-line); border-radius:50%; background:var(--card2); cursor:pointer; -webkit-appearance:none; appearance:none; box-shadow:var(--glass-edge); display:flex; align-items:center; justify-content:center; overflow:visible;}
+  .profile-btn:active{opacity:.7;}
+  .profile-btn .avatar{width:100%; height:100%; border-radius:50%; object-fit:cover; display:block;}
+  .profile-btn .avatar-fallback{font-size:20px; line-height:1; color:var(--muted);}
+  .sync-dot{position:absolute; right:-1px; bottom:-1px; width:11px; height:11px; border-radius:50%; background:var(--muted); border:2px solid var(--glass-bg); box-shadow:0 0 0 1px var(--glass-line);}
+  .sync-dot.ok{background:var(--ok);} .sync-dot.warn{background:var(--due);}
+  /* ---- 設定オーバーレイ ---- */
+  #settings-overlay{position:fixed; inset:0; z-index:100; overflow-y:auto; -webkit-overflow-scrolling:touch; background:var(--glass-bg); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);}
+  #settings-overlay[hidden]{display:none;}
+  .settings-head{position:sticky; top:0; z-index:1; display:flex; align-items:center; gap:12px; padding:calc(env(safe-area-inset-top,0px) + 10px) max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left)); background:var(--glass-bg); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur); border-bottom:1px solid var(--glass-line);}
+  .settings-head .stitle{font-weight:800; font-size:18px;}
+  .icon-btn{margin-left:auto; width:36px; height:36px; flex:none; padding:0; border:1px solid var(--glass-line); border-radius:50%; background:var(--card2); color:var(--ink); font-size:17px; line-height:1; cursor:pointer; -webkit-appearance:none; appearance:none; display:flex; align-items:center; justify-content:center; box-shadow:var(--glass-edge);}
+  .icon-btn:active{opacity:.7;}
+  #settings-body{max-width:760px; margin:0 auto; padding:14px max(16px,env(safe-area-inset-left)) calc(24px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-right));}
   /* タブバーは画面下端から浮いたガラスのカプセル。選択中タブは#tabGliderが
      液体的にスライドして追従する（moveGlider()）。手動オフセット/モード分岐なし。 */
   .tabs{position:fixed; left:50%; bottom:calc(12px + env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:50; width:min(92vw,560px); display:flex; gap:6px; background:var(--glass-bg); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur); border:1px solid var(--glass-line); border-radius:var(--radius-cap); padding:5px; box-shadow:var(--glass-edge), var(--glass-shadow);}
@@ -295,13 +308,24 @@
 
 <div class="topbar">
   <div class="logo">SC 過去問<span class="dot">道場</span> <span style="font-size:11px;font-weight:600;color:var(--muted)">v2</span></div>
-  <button id="syncNote" class="persist-note" type="button">☁ 同期OFF</button>
+  <button id="profileBtn" class="profile-btn" type="button" aria-label="アカウント・設定">
+    <img id="avatarImg" class="avatar" alt="" hidden>
+    <span id="avatarFallback" class="avatar-fallback">👤</span>
+    <span id="syncDot" class="sync-dot"></span>
+  </button>
 </div>
 <div class="wrap">
   <div id="view-home" class="view active"></div>
   <div id="view-study" class="view"></div>
   <div id="view-hist" class="view"></div>
   <div id="view-manage" class="view"></div>
+</div>
+<div id="settings-overlay" hidden>
+  <div class="settings-head">
+    <div class="stitle">設定</div>
+    <button id="settingsClose" class="icon-btn" type="button" aria-label="閉じる">✕</button>
+  </div>
+  <div id="settings-body"></div>
 </div>
 <div class="tabs" role="tablist">
   <div id="tabGlider"></div>
@@ -543,7 +567,7 @@
       locked=false; sx=e.touches[0].clientX; sy=e.touches[0].clientY;
     }, {passive:true});
     root.addEventListener('touchend', e=>{
-      if(locked||e.changedTouches.length!==1) return;
+      if(locked||settingsOpen||e.changedTouches.length!==1) return; // 設定オーバーレイ表示中は下層タブを動かさない
       const dx=e.changedTouches[0].clientX-sx, dy=e.changedTouches[0].clientY-sy;
       if(Math.abs(dx)<MIN_X || Math.abs(dy)>Math.abs(dx)*MAX_Y_RATIO) return;
       const cur=VIEWS.indexOf([...root.querySelectorAll('.tab')].find(t=>t.getAttribute('aria-selected')==='true')?.dataset.view);
@@ -1030,15 +1054,16 @@
   // ---------- MANAGE ----------
   let manageOpenId=null;  // 詳細表示中の問題ID（登録済み一覧）
   let manageQuery='';     // 登録済み一覧の検索キーワード
-  function renderManage(){
-    const v=$('#view-manage'); v.innerHTML='';
+  // 設定画面（アカウントアイコンから開くオーバーレイ）。クラウド同期とAI解説の設定を集約。
+  function renderSettings(){
+    const v=$('#settings-body'); v.innerHTML='';
     // Google同期パネル
     const gp=el('div','panel'); gp.appendChild(el('h3',null,'クラウド同期','<small>端末間で履歴を同期</small>'));
     const grow=el('div'); grow.style.cssText='display:flex;gap:10px;flex-wrap:wrap';
     const onBtn=el('button','btn sm'); onBtn.textContent='Googleでログインして同期ON';
     onBtn.addEventListener('click',enableSync);
     const offBtn=el('button','btn sec sm'); offBtn.textContent='同期OFF';
-    offBtn.addEventListener('click',async()=>{ await disableSync(); renderManage(); });
+    offBtn.addEventListener('click',async()=>{ await disableSync(); renderSettings(); updateProfileIcon(); });
     grow.appendChild(onBtn); grow.appendChild(offBtn); gp.appendChild(grow);
     const ghelp=el('div','mini'); ghelp.style.marginTop='8px';
     ghelp.textContent= syncEnabled ? '同期中。解答するたび自動で保存されます。' : 'ログインすると他の端末と学習履歴を共有できます。';
@@ -1064,6 +1089,13 @@
     ahelp.innerHTML='キーは <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="color:var(--primary)">Google AI Studio</a> で無料取得できます。キーはこの端末にのみ保存され、同期・バックアップには含まれません。モデルは常に最新版に自動追従します。AIの解説は誤りを含むことがあります。';
     ap.appendChild(ahelp); ap.appendChild(amsg);
     v.appendChild(ap);
+  }
+  let settingsOpen=false;
+  function openSettings(){ renderSettings(); $('#settings-overlay').hidden=false; settingsOpen=true; window.scrollTo(0,0); }
+  function closeSettings(){ $('#settings-overlay').hidden=true; settingsOpen=false; }
+
+  function renderManage(){
+    const v=$('#view-manage'); v.innerHTML='';
 
     // current data summary + export/reset + browse
     const sp=el('div','panel'); sp.appendChild(el('h3',null,'登録済みの問題','<small>'+questions.length+' 問</small>'));
@@ -1338,17 +1370,29 @@
     }, 4000);
   }
 
+  let syncStatus='off';
   function setSyncStatus(s){
-    const n=$('#syncNote'); if(!n) return;
-    if(s==='ok'){ n.textContent='☁ 同期中'; n.className='persist-note'; }
-    else if(s==='reauth' || s==='error'){ n.textContent='⚠ 未同期'; n.className='persist-note warn'; }
-    else { n.textContent='☁ 未同期'; n.className='persist-note'; }
-    n.dataset.status=s||'off';
+    syncStatus=s||'off';
+    const d=$('#syncDot');
+    if(d) d.className='sync-dot'+(syncStatus==='ok'?' ok':((syncStatus==='reauth'||syncStatus==='error')?' warn':''));
+    if(settingsOpen) renderSettings(); // 設定画面が開いていれば説明文言も更新
   }
-  async function onSyncNoteClick(){
-    const n=$('#syncNote'); const s=n ? n.dataset.status : 'off';
-    if(s==='ok') return; // 同期中はこのボタンでOFFにしない
-    await enableSync();
+  // 右上アイコン: ログイン中はGoogleのプロフィール画像、未ログインはフォールバック(👤)
+  function updateProfileIcon(){
+    const img=$('#avatarImg'), fb=$('#avatarFallback');
+    if(!img||!fb) return;
+    const url=(fbUser&&fbUser.photoURL)||'';
+    if(url){
+      // src の再代入は読込中のデコードを中断させるため、URLが変わる時だけ張り替える
+      if(img.getAttribute('src')!==url){
+        img.onload=()=>{ img.hidden=false; fb.hidden=true; };
+        img.onerror=()=>{ img.hidden=true; fb.hidden=false; };
+        img.src=url;
+      }
+      if(img.complete && img.naturalWidth>0){ img.hidden=false; fb.hidden=true; }
+    } else {
+      img.onload=null; img.onerror=null; img.hidden=true; img.removeAttribute('src'); fb.hidden=false;
+    }
   }
 
   async function enableSync(){
@@ -1368,15 +1412,16 @@
       fbUser=firebase.auth().currentUser;
       syncEnabled=true;
       try{ localStorage.setItem('kakomon:syncEnabled','1'); }catch(e){}
+      updateProfileIcon();
       await pullMergePush();
-      show('home');
+      if(settingsOpen) renderSettings();
     }catch(e){ console.error(e); setSyncStatus('error'); alert('Googleログインに失敗しました。'); }
   }
   async function disableSync(){
     syncEnabled=false; fbUser=null;
     try{ localStorage.removeItem('kakomon:syncEnabled'); }catch(e){}
     try{ await waitForFirebase(); await firebase.auth().signOut(); }catch(e){}
-    setSyncStatus('off');
+    setSyncStatus('off'); updateProfileIcon();
   }
   async function initSync(){
     let want=false; try{ want=localStorage.getItem('kakomon:syncEnabled')==='1'; }catch(e){}
@@ -1391,7 +1436,7 @@
     }catch(e){ redirectFailed=true; console.error(e); }
     let first=true;
     firebase.auth().onAuthStateChanged(async u=>{
-      fbUser=u;
+      fbUser=u; updateProfileIcon();
       let w=false; try{ w=localStorage.getItem('kakomon:syncEnabled')==='1'; }catch(e){}
       if(u && w){
         syncEnabled=true;
@@ -1583,7 +1628,9 @@
 
   // ---------- boot ----------
   (async function init(){
-    $('#syncNote').addEventListener('click', onSyncNoteClick);
+    $('#profileBtn').addEventListener('click', openSettings);
+    $('#settingsClose').addEventListener('click', closeSettings);
+    updateProfileIcon();
     questions = await jget('kakomon:questions', []);
     progress = await jget('kakomon:progress', {});
     // 旧スキーマ(固定間隔)からの移行: 履歴から ivl/ef/due 等を再計算
