@@ -250,6 +250,13 @@
   .ai-msg ul{margin:4px 0; padding-left:19px;}
   .ai-msg li{margin:2px 0;}
   .ai-msg code{background:var(--track); border-radius:5px; padding:1px 5px; font-size:12.5px;}
+  /* ミニLaTeX描画（$$..$$/$..$） */
+  .ai-msg .math{display:block; text-align:center; margin:8px 0; font-size:14.5px; overflow-x:auto;}
+  .ai-msg .tex-fr{display:inline-flex; flex-direction:column; text-align:center; vertical-align:middle; margin:0 2px;}
+  .ai-msg .tex-fn{border-bottom:1px solid currentColor; padding:0 4px;}
+  .ai-msg .tex-fd{padding:0 4px;}
+  .ai-msg .tex-sq{border-top:1px solid currentColor;}
+  .ai-msg sup,.ai-msg sub{font-size:.72em;}
   .ai-typing{opacity:.65;}
   .ai-quick{display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;}
   .ai-quick button{border:1.5px solid var(--line); background:var(--card2); color:var(--primary); border-radius:var(--radius-cap); padding:6px 12px; font-family:inherit; font-size:12px; font-weight:700; cursor:pointer;}
@@ -1468,7 +1475,7 @@
   // （固定IDは提供終了で404になるため。例: gemini-2.5-flash は2026年に廃止）
   const AI_MODELS={'gemini-flash-latest':'Flash（高品質）','gemini-flash-lite-latest':'Flash-Lite（軽量・高速）'};
   let aiKey='', aiModel='gemini-flash-latest';
-  const AI_SYS='あなたは情報処理安全確保支援士（SC）試験の熟練講師です。受験者が過去問を深く理解できるよう、日本語で分かりやすく解説してください。\n最初の解説依頼には次の構成で答えてください:\n## 正解と要点\n## 各選択肢の解説（ア〜エそれぞれが正しい/誤りである理由）\n## キーワード解説（問題文や選択肢の重要用語を簡潔に）\n計算・論理式・数式変形・進数変換・確率などを含む問題では、途中式や変形過程を省略せず、番号付きのステップで順を追って解説してください。\n追加質問にはその質問に絞って簡潔に答えてください。装飾は太字・箇条書き・見出し（##）程度にとどめ、表やHTMLは使わないでください。';
+  const AI_SYS='あなたは情報処理安全確保支援士（SC）試験の熟練講師です。受験者が過去問を深く理解できるよう、日本語で分かりやすく解説してください。\n最初の解説依頼には次の構成で答えてください:\n## 正解と要点\n## 各選択肢の解説（ア〜エそれぞれが正しい/誤りである理由）\n## キーワード解説（問題文や選択肢の重要用語を簡潔に）\n計算・論理式・数式変形・進数変換・確率などを含む問題では、途中式や変形過程を省略せず、番号付きのステップで順を追って解説してください。\n追加質問にはその質問に絞って簡潔に答えてください。装飾は太字・箇条書き・見出し（##）程度にとどめ、表やHTMLは使わないでください。\n数式は $$...$$（独立行）または $...$（行内）のLaTeXで書いてください。使うコマンドは \\frac, \\sqrt, \\times, \\cdot, \\div, \\le, \\ge, \\approx, \\pm, ^, _, \\text 程度にとどめてください。';
   function aiRef(id){ return firebase.firestore().doc('users/'+fbUser.uid+'/ai/'+id); }
   async function aiCacheGet(qid){
     let c=await jget('kakomon:ai:'+qid, null);
@@ -1484,8 +1491,51 @@
       try{ if(JSON.stringify(c).length<=900000) aiRef(qid).set(c).catch(e=>console.warn('ai push failed', e)); }catch(e){}
     }
   }
-  // AI応答の簡易Markdown描画。全文をescapeHTMLしてから太字・見出し・箇条書き・codeのみ変換（XSS安全）
+  // ミニLaTeXレンダラ: \frac・^・_・\sqrt・\text・記号のサブセットをHTML化。
+  // テキスト断片は全てescapeHTMLを通す（XSS安全）。未対応コマンドは名前をそのまま表示。
+  const TEX_SYM={times:'×',cdot:'·',div:'÷',le:'≦',leq:'≦',ge:'≧',geq:'≧',neq:'≠',ne:'≠',approx:'≈',pm:'±',infty:'∞',alpha:'α',beta:'β',gamma:'γ',lambda:'λ',mu:'μ',sigma:'σ',pi:'π',theta:'θ',Delta:'Δ',rightarrow:'→',to:'→',dots:'…',cdots:'…',ldots:'…'};
+  function texToHtml(src){
+    let i=0;
+    function group(){ // 直後の {…} または1コマンド/1文字
+      if(src[i]==='{'){ i++; const h=seq('}'); i++; return h; }
+      if(src[i]==='\\') return cmd();
+      return escapeHTML(src[i++]||'');
+    }
+    function cmd(){ // src[i] は '\'
+      i++;
+      const m=/^[a-zA-Z]+/.exec(src.slice(i));
+      if(!m){ const ch=src[i++]||''; if(ch===','||ch===';') return ' '; return escapeHTML(ch); } // \{ \} \% \$ など
+      const name=m[0]; i+=name.length;
+      if(name==='frac'){ const a=group(), b=group(); return '<span class="tex-fr"><span class="tex-fn">'+a+'</span><span class="tex-fd">'+b+'</span></span>'; }
+      if(name==='sqrt'){ return '√<span class="tex-sq">'+group()+'</span>'; }
+      if(name==='text'||name==='mathrm'||name==='textrm'||name==='operatorname') return group();
+      if(name==='mathbf'||name==='textbf') return '<b>'+group()+'</b>';
+      if(name==='left'||name==='right') return '';
+      if(name==='quad'||name==='qquad') return '　';
+      if(TEX_SYM[name]!==undefined) return TEX_SYM[name];
+      return escapeHTML(name);
+    }
+    function seq(end){
+      let h='';
+      while(i<src.length && src[i]!==end){
+        const c=src[i];
+        if(c==='\\') h+=cmd();
+        else if(c==='^'){ i++; h+='<sup>'+group()+'</sup>'; }
+        else if(c==='_'){ i++; h+='<sub>'+group()+'</sub>'; }
+        else if(c==='{'){ i++; h+=seq('}'); i++; }
+        else { h+=escapeHTML(c); i++; }
+      }
+      return h;
+    }
+    return seq();
+  }
+  // AI応答の簡易Markdown描画。数式($$..$$/$..$)を先に描画して退避し、
+  // 残りをescapeHTML後に太字・見出し・箇条書き・codeのみ変換（XSS安全）
   function mdLite(t){
+    const math=[];
+    t=String(t==null?'':t)
+      .replace(/\$\$([\s\S]+?)\$\$/g,(_,x)=>{ math.push('<span class="math">'+texToHtml(x.trim())+'</span>'); return '\x01'+(math.length-1)+'\x01'; })
+      .replace(/\$([^$\n]+?)\$/g,(_,x)=>{ math.push(texToHtml(x)); return '\x01'+(math.length-1)+'\x01'; });
     const inline=s=>s.replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
     const out=[]; let ul=false;
     for(const ln of escapeHTML(t).split('\n')){
@@ -1498,7 +1548,7 @@
       out.push('<p>'+inline(ln)+'</p>');
     }
     if(ul) out.push('</ul>');
-    return out.join('');
+    return out.join('').replace(/\x01(\d+)\x01/g,(_,n)=>math[+n]);
   }
   // 問題コンテキスト（初回ターン）。画像付き問題は inline_data で画像も添付。
   async function aiContextParts(q, resultLabel){
