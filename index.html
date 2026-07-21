@@ -82,30 +82,28 @@
   @media (prefers-reduced-motion:reduce){ #app-root::before{transition:none;} }
   .stat,.panel,.qcard,.scorecard,.daylist{-webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur);}
   #app-root *{box-sizing:border-box;}
-  /* padding-bottom = 浮遊タブバーの高さ+浮遊マージン + 安全領域。最下部コンテンツがタブバーに隠れないように */
-  .wrap{max-width:760px; margin:0 auto; padding:14px 16px calc(88px + env(safe-area-inset-bottom));}
-  /* 上下バーは半透明グラス（背景の全画面グラデが透ける）。blurで可読性を確保 */
-  .topbar{position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:12px; padding:calc(env(safe-area-inset-top,0px) + 10px) max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left)); background:var(--glass-bg); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur); border-bottom:1px solid var(--glass-line);}
-  .logo{font-weight:800; font-size:19px; letter-spacing:.02em;}
-  .logo .dot{color:var(--primary);}
-  .persist-note{margin-left:auto; font-size:11.5px; color:var(--muted); background:var(--card2); border:1px solid var(--line); padding:4px 9px; border-radius:999px;}
+  /* padding-top = 浮遊トップバー、padding-bottom = 浮遊タブバー。どちらにも隠れないように */
+  .wrap{max-width:760px; margin:0 auto; padding:calc(env(safe-area-inset-top,0px) + 74px) 16px calc(88px + env(safe-area-inset-bottom));}
+  /* ---- 上部：浮遊ガラスバー（ハンバーガー＋AMⅠ/AMⅡ区分トグル） ---- */
+  .topbar-float{position:fixed; top:calc(env(safe-area-inset-top,0px) + 10px); left:50%; transform:translateX(-50%); z-index:60; display:flex; align-items:center; gap:10px; width:min(92vw,560px); padding-left:max(0px,calc(env(safe-area-inset-left) - 4vw)); padding-right:max(0px,calc(env(safe-area-inset-right) - 4vw));}
+  .menu-btn{position:relative; flex:none; width:46px; height:46px; padding:0; border:1px solid var(--glass-line); border-radius:var(--radius-cap); background:var(--glass-bg); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur); box-shadow:var(--glass-edge), var(--glass-shadow); color:var(--ink); font-size:18px; line-height:1; cursor:pointer; -webkit-appearance:none; appearance:none; display:flex; align-items:center; justify-content:center; overflow:visible; transition:transform var(--dur-fast) var(--ease-press), background .35s var(--ease-liquid), color .35s var(--ease-liquid), border-color .35s var(--ease-liquid);}
+  .menu-btn:active{transform:scale(.92);}
+  .menu-btn.on{background:var(--tab-on-bg); color:var(--tab-on-ink); border-color:var(--tab-on-bg);}
+  .menu-ic{font-size:18px; font-weight:700;}
+  .sec-seg{position:relative; flex:1; display:flex; gap:6px; padding:5px; border:1px solid var(--glass-line); border-radius:var(--radius-cap); background:var(--glass-bg); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur); box-shadow:var(--glass-edge), var(--glass-shadow);}
+  #secGlider{position:absolute; top:5px; bottom:5px; left:0; width:0; border-radius:var(--radius-cap); background:var(--tab-on-bg); box-shadow:var(--shadow); z-index:0; pointer-events:none; transition:transform var(--dur-med) var(--ease-liquid), width var(--dur-med) var(--ease-liquid);}
+  .sec-btn{position:relative; z-index:1; flex:1; text-align:center; padding:9px 4px; border-radius:var(--radius-cap); font-size:14px; font-weight:700; letter-spacing:.03em; color:var(--muted); cursor:pointer; border:none; background:transparent; font-family:inherit; transition:color var(--dur-fast) var(--ease-liquid);}
+  .sec-btn[aria-selected="true"]{color:var(--tab-on-ink);}
+  .persist-note{font-size:11.5px; color:var(--muted); background:var(--card2); border:1px solid var(--line); padding:4px 9px; border-radius:999px;}
   .persist-note.warn{color:var(--due); border-color:var(--due-soft); background:var(--due-soft);}
-  /* 右上のアカウントアイコン（Googleログイン時はプロフィール画像）。タップで設定画面を開く */
-  .profile-btn{margin-left:auto; position:relative; width:38px; height:38px; flex:none; padding:0; border:1px solid var(--glass-line); border-radius:50%; background:var(--card2); cursor:pointer; -webkit-appearance:none; appearance:none; box-shadow:var(--glass-edge); display:flex; align-items:center; justify-content:center; overflow:visible;}
-  .profile-btn:active{opacity:.7;}
-  .profile-btn .avatar{width:100%; height:100%; border-radius:50%; object-fit:cover; display:block;}
-  .profile-btn .avatar[hidden]{display:none;} /* display:blockがhidden属性を打ち消し、src無しimgの縁が縦線として見えるのを防ぐ */
-  .profile-btn .avatar-fallback{font-size:20px; line-height:1; color:var(--muted);}
-  .sync-dot{position:absolute; right:-1px; bottom:-1px; width:11px; height:11px; border-radius:50%; background:var(--muted); border:2px solid var(--glass-bg); box-shadow:0 0 0 1px var(--glass-line);}
+  .sync-dot{position:absolute; right:-2px; bottom:-2px; width:12px; height:12px; border-radius:50%; background:var(--muted); border:2px solid var(--glass-bg); box-shadow:0 0 0 1px var(--glass-line);}
   .sync-dot.ok{background:var(--ok);} .sync-dot.warn{background:var(--due);}
-  /* ---- 設定オーバーレイ ---- */
-  #settings-overlay{position:fixed; inset:0; z-index:100; overflow-y:auto; -webkit-overflow-scrolling:touch; background:var(--glass-bg); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);}
-  #settings-overlay[hidden]{display:none;}
-  .settings-head{position:sticky; top:0; z-index:1; display:flex; align-items:center; gap:12px; padding:calc(env(safe-area-inset-top,0px) + 10px) max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left)); background:var(--glass-bg); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur); border-bottom:1px solid var(--glass-line);}
-  .settings-head .stitle{font-weight:800; font-size:18px;}
-  .icon-btn{margin-left:auto; width:36px; height:36px; flex:none; padding:0; border:1px solid var(--glass-line); border-radius:50%; background:var(--card2); color:var(--ink); font-size:17px; line-height:1; cursor:pointer; -webkit-appearance:none; appearance:none; display:flex; align-items:center; justify-content:center; box-shadow:var(--glass-edge);}
-  .icon-btn:active{opacity:.7;}
-  #settings-body{max-width:760px; margin:0 auto; padding:14px max(16px,env(safe-area-inset-left)) calc(24px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-right));}
+  .gicon{flex:none; width:30px; height:30px; border-radius:50%; background:#fff; color:#4285F4; border:1px solid var(--glass-line); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:16px; box-shadow:var(--glass-edge);}
+  /* 区分切替時のカード風スライド（左右）。再描画後に付与し animationend で外す */
+  @keyframes cardInR{from{opacity:0; transform:translateX(30px) scale(.985);} to{opacity:1; transform:none;}}
+  @keyframes cardInL{from{opacity:0; transform:translateX(-30px) scale(.985);} to{opacity:1; transform:none;}}
+  .view.sec-in-r{animation:cardInR var(--dur-med) var(--ease-liquid) both;}
+  .view.sec-in-l{animation:cardInL var(--dur-med) var(--ease-liquid) both;}
   /* タブバーは画面下端から浮いたガラスのカプセル。選択中タブは#tabGliderが
      液体的にスライドして追従する（moveGlider()）。手動オフセット/モード分岐なし。 */
   .tabs{position:fixed; left:50%; bottom:calc(12px + env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:50; width:min(92vw,560px); display:flex; gap:6px; background:var(--glass-bg); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur); border:1px solid var(--glass-line); border-radius:var(--radius-cap); padding:5px; box-shadow:var(--glass-edge), var(--glass-shadow);}
@@ -314,13 +312,16 @@
   }
 </style>
 
-<div class="topbar">
-  <div class="logo">SC 過去問<span class="dot">道場</span> <span style="font-size:11px;font-weight:600;color:var(--muted)">v2</span></div>
-  <button id="profileBtn" class="profile-btn" type="button" aria-label="アカウント・設定">
-    <img id="avatarImg" class="avatar" alt="" hidden>
-    <span id="avatarFallback" class="avatar-fallback">👤</span>
+<div class="topbar-float" role="group" aria-label="区分と管理">
+  <button id="menuBtn" class="menu-btn" type="button" aria-label="管理画面を開く">
+    <span class="menu-ic" aria-hidden="true">☰</span>
     <span id="syncDot" class="sync-dot"></span>
   </button>
+  <div class="sec-seg" role="tablist" aria-label="午前区分">
+    <div id="secGlider"></div>
+    <button class="sec-btn" data-sec="午前1" role="tab" aria-selected="true">AMⅠ</button>
+    <button class="sec-btn" data-sec="午前2" role="tab" aria-selected="false">AMⅡ</button>
+  </div>
 </div>
 <div class="wrap">
   <div id="view-home" class="view active"></div>
@@ -328,19 +329,11 @@
   <div id="view-hist" class="view"></div>
   <div id="view-manage" class="view"></div>
 </div>
-<div id="settings-overlay" hidden>
-  <div class="settings-head">
-    <div class="stitle">設定</div>
-    <button id="settingsClose" class="icon-btn" type="button" aria-label="閉じる">✕</button>
-  </div>
-  <div id="settings-body"></div>
-</div>
 <div class="tabs" role="tablist">
   <div id="tabGlider"></div>
   <button class="tab" role="tab" data-view="home" aria-selected="true">ホーム</button>
   <button class="tab" role="tab" data-view="study" aria-selected="false">学習</button>
   <button class="tab" role="tab" data-view="hist" aria-selected="false">履歴</button>
-  <button class="tab" role="tab" data-view="manage" aria-selected="false">問題管理</button>
 </div>
 </div>
 
@@ -490,6 +483,10 @@
     return 3;                                        // 未来(期限前)
   }
   const secLabel = s => (s==='午前2' ? '午前II' : '午前I');  // section値(算用数字)→表示(ローマ数字)
+  // 上部トグルで選ぶ現在の区分。ホーム／履歴／問題管理の表示をこの区分に絞る（学習セッションは対象外）。
+  let activeSection = '午前1';
+  const secOf = q => (q.section||'午前1');
+  const inActiveSection = q => secOf(q)===activeSection;
   function matchFilter(q,f){
     if(!f) return true;
     if(f.section && (q.section||'午前1')!==f.section) return false;
@@ -535,15 +532,28 @@
   }
 
   // ---------- views switching ----------
-  // タブ選択ハイライトは#tabGliderが液体的にスライドして追従する
+  let currentView='home';
+  // タブ選択ハイライトは#tabGliderが液体的にスライドして追従する。
+  // 管理画面（ハンバーガーで開く）はタブに無いので、その時はグライダーを隠す。
   function moveGlider(){
     const t=root.querySelector('.tab[aria-selected="true"]'), g=$('#tabGlider');
-    if(!t||!g) return;
+    if(!g) return;
+    if(!t){ g.style.width='0px'; return; }
     g.style.width=t.offsetWidth+'px';
     g.style.transform='translateX('+t.offsetLeft+'px)';
   }
+  // AMⅠ/AMⅡトグルのハイライト
+  function moveSecGlider(){
+    const b=root.querySelector('.sec-btn[aria-selected="true"]'), g=$('#secGlider');
+    if(!b||!g) return;
+    g.style.width=b.offsetWidth+'px';
+    g.style.transform='translateX('+b.offsetLeft+'px)';
+  }
   function show(view){
+    currentView=view;
+    // タブに無い管理画面のときは全タブ非選択（グライダー非表示）＋ハンバーガーを点灯
     root.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-selected', t.dataset.view===view));
+    const mb=$('#menuBtn'); if(mb) mb.classList.toggle('on', view==='manage');
     root.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
     $('#view-'+view).classList.add('active');
     if(view==='home') renderHome();
@@ -554,20 +564,46 @@
     moveGlider();
   }
   root.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>show(t.dataset.view)));
-  window.addEventListener('resize', moveGlider);
+  $('#menuBtn').addEventListener('click',()=> show(currentView==='manage' ? 'home' : 'manage'));
+
+  // AMⅠ/AMⅡ の切替。ホーム／履歴／問題管理を対象に絞る（学習は対象外）。dir>0で左方向へ入るカード演出。
+  async function switchSection(sec, dir){
+    if(sec===activeSection) return;
+    activeSection=sec;
+    jset('kakomon:activeSection', sec);
+    root.querySelectorAll('.sec-btn').forEach(b=>b.setAttribute('aria-selected', b.dataset.sec===sec));
+    moveSecGlider();
+    // 学習タブは区分の影響を受けない。それ以外は再描画してカード風にスライドイン。
+    if(currentView==='study') return;
+    if(currentView==='home') renderHome();
+    else if(currentView==='hist') renderHist();
+    else if(currentView==='manage') renderManage();
+    const av=$('#view-'+currentView);
+    if(av){
+      const cls = dir<0 ? 'sec-in-l' : 'sec-in-r';
+      av.classList.remove('sec-in-l','sec-in-r'); void av.offsetWidth; av.classList.add(cls);
+      av.addEventListener('animationend',()=>av.classList.remove(cls),{once:true});
+    }
+    window.scrollTo(0,0);
+  }
+  const SECS=['午前1','午前2'];
+  root.querySelectorAll('.sec-btn').forEach(b=>b.addEventListener('click',()=>{
+    const target=b.dataset.sec, dir = SECS.indexOf(target)>SECS.indexOf(activeSection) ? 1 : -1;
+    switchSection(target, dir);
+  }));
+  window.addEventListener('resize', ()=>{ moveGlider(); moveSecGlider(); });
   // 初回配置はtransition無しで一発で合わせる（スライドインを防止）。
-  // フォント読込等での遅延ズレに備え少し後にも再計算する。
   (function(){
-    const g=$('#tabGlider');
-    if(g) g.style.transition='none';
-    moveGlider();
-    requestAnimationFrame(()=>{ if(g) g.style.transition=''; });
-    setTimeout(moveGlider, 300);
+    const g=$('#tabGlider'), sg=$('#secGlider');
+    if(g) g.style.transition='none'; if(sg) sg.style.transition='none';
+    moveGlider(); moveSecGlider();
+    requestAnimationFrame(()=>{ if(g) g.style.transition=''; if(sg) sg.style.transition=''; });
+    setTimeout(()=>{ moveGlider(); moveSecGlider(); }, 300);
   })();
 
-  // ---------- スワイプでタブ切り替え（タッチデバイス） ----------
+  // ---------- スワイプで区分（AMⅠ/AMⅡ）切り替え（タッチデバイス） ----------
+  // タブ切替のスワイプは廃止。左右スワイプは区分トグルの切り替えに割り当てる。
   (function(){
-    const VIEWS=['home','study','hist','manage'];
     const MIN_X=55, MAX_Y_RATIO=0.6; // 水平55px以上、かつ垂直より水平が優勢
     let sx=0, sy=0, locked=false;
     root.addEventListener('touchstart', e=>{
@@ -575,13 +611,13 @@
       locked=false; sx=e.touches[0].clientX; sy=e.touches[0].clientY;
     }, {passive:true});
     root.addEventListener('touchend', e=>{
-      if(locked||settingsOpen||e.changedTouches.length!==1) return; // 設定オーバーレイ表示中は下層タブを動かさない
+      if(locked||e.changedTouches.length!==1) return;
+      if(currentView==='study') return; // 学習中は区分スワイプ無効
       const dx=e.changedTouches[0].clientX-sx, dy=e.changedTouches[0].clientY-sy;
       if(Math.abs(dx)<MIN_X || Math.abs(dy)>Math.abs(dx)*MAX_Y_RATIO) return;
-      const cur=VIEWS.indexOf([...root.querySelectorAll('.tab')].find(t=>t.getAttribute('aria-selected')==='true')?.dataset.view);
-      if(cur<0) return;
-      const next=dx<0 ? Math.min(cur+1,VIEWS.length-1) : Math.max(cur-1,0);
-      if(next!==cur) show(VIEWS[next]);
+      const cur=SECS.indexOf(activeSection);
+      const next = dx<0 ? Math.min(cur+1,SECS.length-1) : Math.max(cur-1,0);
+      if(next!==cur) switchSection(SECS[next], dx<0?1:-1);
     }, {passive:true});
   })();
 
@@ -622,13 +658,18 @@
   // ---------- HOME ----------
   function renderHome(){
     const v=$('#view-home'); v.innerHTML='';
-    const now=Date.now();
+    // 上部トグルの区分（AMⅠ/AMⅡ）に絞ってホームを構成する
+    const qs=questions.filter(inActiveSection);
     let nNew=0,nDueWrong=0,nDueRev=0,answered=0,correct=0;
-    questions.forEach(q=>{const g=groupOf(q); if(g===0)nNew++; else if(g===1)nDueWrong++; else if(g===2)nDueRev++;});
-    Object.values(progress).forEach(p=>p.attempts.forEach(a=>{answered++; if(a.ok)correct++;}));
+    qs.forEach(q=>{const g=groupOf(q); if(g===0)nNew++; else if(g===1)nDueWrong++; else if(g===2)nDueRev++;
+      const p=progress[q.id]; if(p) p.attempts.forEach(a=>{answered++; if(a.ok)correct++;});});
 
     if(!questions.length){
       v.appendChild(el('div','empty','<div class="big">📚</div><div>まだ問題がありません。<br>通常は自動で読み込まれます。<br>別端末のデータは「問題管理」→クラウド同期、またはバックアップから復元できます。</div>'));
+      return;
+    }
+    if(!qs.length){
+      v.appendChild(el('div','empty','<div class="big">📭</div><div>この区分（'+secLabel(activeSection)+'）の問題はまだありません。<br>上部の区分トグルで切り替えてください。</div>'));
       return;
     }
     // トップにスコア（累計＋今日）を表示
@@ -658,28 +699,26 @@
     const p=el('div','panel'); p.appendChild(el('h3',null,'今すぐ学習を始める'));
     const dueTotal=nNew+nDueWrong+nDueRev;
     const rec=el('button','startbtn wide','おすすめ（忘却曲線順）<small>'+ (dueTotal? '未回答＋復習 '+dueTotal+'問' : '今日の復習はありません・全問から出題') +'</small>');
-    rec.addEventListener('click',()=>startSession(null, dueTotal===0));
+    rec.addEventListener('click',()=>startSession({section:activeSection}, dueTotal===0, 'おすすめ・'+secLabel(activeSection)));
     p.appendChild(rec);
     v.appendChild(p);
 
-    // by year × section
-    const pairs=[];
-    questions.forEach(q=>{ if(q.year){ const s=q.section||'午前1'; const k=q.year+'\t'+s; if(!pairs.includes(k)) pairs.push(k); } });
-    if(pairs.length){
+    // by year（現在の区分のみ）
+    const years=[...new Set(qs.map(q=>q.year))].filter(Boolean);
+    if(years.length){
       const yp=el('div','panel'); yp.appendChild(el('h3',null,'年度別に学習','<small>全問を忘却曲線順で</small>'));
       const g=el('div','startgrid');
-      pairs.forEach(k=>{
-        const [y,s]=k.split('\t');
-        const label=y+' '+secLabel(s);
-        const cnt=questions.filter(q=>q.year===y && (q.section||'午前1')===s).length;
-        const b=el('button','startbtn ghost', label+'<small>'+cnt+'問</small>');
-        b.addEventListener('click',()=>startSession({year:y, section:s}, true, label));
+      years.forEach(y=>{
+        const cnt=qs.filter(q=>q.year===y).length;
+        const label=y+' '+secLabel(activeSection);
+        const b=el('button','startbtn ghost', y+'<small>'+cnt+'問</small>');
+        b.addEventListener('click',()=>startSession({year:y, section:activeSection}, true, label));
         g.appendChild(b);
       });
       yp.appendChild(g); v.appendChild(yp);
     }
-    // by category (+ calc) — checkbox multi-select
-    const cats=[...new Set(questions.map(q=>q.category))].filter(Boolean);
+    // by category (+ calc) — checkbox multi-select（現在の区分のみ）
+    const cats=[...new Set(qs.map(q=>q.category))].filter(Boolean);
     if(cats.length){
       const cp=el('div','panel'); cp.appendChild(el('h3',null,'区分を選んで学習','<small>複数選択可・忘却曲線順で出題</small>'));
 
@@ -702,34 +741,22 @@
 
       cp.appendChild(el('div','subhead','分類'));
       const cg=el('div','chkgrid'); const catChips=[];
-      cats.forEach(c=>{ const cnt=questions.filter(q=>q.category===c).length; catChips.push(chip(cg, c, c, cnt, true)); });
+      cats.forEach(c=>{ const cnt=qs.filter(q=>q.category===c).length; catChips.push(chip(cg, c, c, cnt, true)); });
       cp.appendChild(cg);
       cp.appendChild(selBar(catChips));
 
       cp.appendChild(el('div','subhead','計算の有無'));
       const calcG=el('div','chkgrid');
-      const calcN=questions.filter(q=>q.calc).length, nonCalcN=questions.length-calcN;
+      const calcN=qs.filter(q=>q.calc).length, nonCalcN=qs.length-calcN;
       const calcYesChip=chip(calcG,'yes','計算問題',calcN,true), calcNoChip=chip(calcG,'no','計算以外',nonCalcN,true);
       cp.appendChild(calcG);
       cp.appendChild(selBar([calcYesChip, calcNoChip]));
-
-      // 区分（午前I／II）— 複数の区分が存在するときだけ表示
-      const secs=[...new Set(questions.map(q=>q.section||'午前1'))];
-      secs.sort();  // '午前1' < '午前2'
-      const secChips={};
-      if(secs.length>1){
-        cp.appendChild(el('div','subhead','区分（午前I／II）'));
-        const secG=el('div','chkgrid');
-        secs.forEach(s=>{ const cnt=questions.filter(q=>(q.section||'午前1')===s).length; secChips[s]=chip(secG, s, secLabel(s), cnt, true); });
-        cp.appendChild(secG);
-        cp.appendChild(selBar(Object.values(secChips)));
-      }
 
       cp.appendChild(el('div','subhead','難易度'));
       const diffG=el('div','chkgrid'); diffG.style.gridTemplateColumns='repeat(2,1fr)';
       const diffChips={};
       [['hard','ハード'],['normal','ノーマル'],['easy','イージー'],['unset','未設定']].forEach(([v,lbl])=>{
-        const cnt=questions.filter(q=>(difficulty[q.id]||'unset')===v).length;
+        const cnt=qs.filter(q=>(difficulty[q.id]||'unset')===v).length;
         diffChips[v]=chip(diffG, v, lbl, cnt, true);
       });
       cp.appendChild(diffG);
@@ -745,17 +772,12 @@
         const dsel=Object.keys(diffChips).filter(v=>diffChips[v].classList.contains('on'));
         // 全4つ選択中はフィルタなし（diffs=null）
         const diffs=(dsel.length===4||dsel.length===0)?null:dsel;
-        // 区分: 全ON（＝存在する区分すべて）または全OFFは制限なし（sections=null）
-        const ssel=Object.keys(secChips).filter(s=>secChips[s].classList.contains('on'));
-        const secKeys=Object.keys(secChips);
-        const sections=(secKeys.length===0||ssel.length===secKeys.length||ssel.length===0)?null:ssel;
-        return {categories:sc, calc, yes, no, diffs, dsel, sections, ssel, secKeys};
+        return {categories:sc, calc, yes, no, diffs, dsel};
       }
-      function matchCount(f){ return questions.filter(q=>matchFilter(q,{categories:f.categories, calc:f.calc, diffs:f.diffs, sections:f.sections})).length; }
+      function matchCount(f){ return questions.filter(q=>matchFilter(q,{categories:f.categories, calc:f.calc, diffs:f.diffs, section:activeSection})).length; }
       function updateCount(){
         const f=selected();
-        const secBad=(f.secKeys.length>0 && f.ssel.length===0);
-        const n=(!f.categories.length || (!f.yes&&!f.no) || f.dsel.length===0 || secBad) ? 0 : matchCount(f);
+        const n=(!f.categories.length || (!f.yes&&!f.no) || f.dsel.length===0) ? 0 : matchCount(f);
         startB.innerHTML='選択した区分で学習<small>'+n+' 問</small>';
         startB.disabled=(n===0);
       }
@@ -764,12 +786,10 @@
         if(!f.categories.length){ flash(cmsg,'bad','分類を1つ以上選択してください。'); return; }
         if(!f.yes&&!f.no){ flash(cmsg,'bad','「計算問題」「計算以外」のいずれかを選択してください。'); return; }
         if(!f.dsel.length){ flash(cmsg,'bad','難易度を1つ以上選択してください。'); return; }
-        if(f.secKeys.length>0 && f.ssel.length===0){ flash(cmsg,'bad','「午前I」「午前II」のいずれかを選択してください。'); return; }
         const diffLab=f.diffs ? '・'+(f.diffs.map(d=>DIFF_META[d]?DIFF_META[d].l:'未設定').join('/')) : '';
-        const secLab=f.sections ? '・'+f.sections.map(secLabel).join('/') : '';
-        const lab=(f.categories.length===cats.length?'全分類':(f.categories.length===1?f.categories[0]:f.categories.length+'分類'))
-          + secLab + (f.calc==='yes'?'・計算':f.calc==='no'?'・計算以外':'') + diffLab;
-        startSession({categories:f.categories, calc:f.calc, diffs:f.diffs, sections:f.sections}, true, lab);
+        const lab=secLabel(activeSection)+'・'+(f.categories.length===cats.length?'全分類':(f.categories.length===1?f.categories[0]:f.categories.length+'分類'))
+          + (f.calc==='yes'?'・計算':f.calc==='no'?'・計算以外':'') + diffLab;
+        startSession({categories:f.categories, calc:f.calc, diffs:f.diffs, section:activeSection}, true, lab);
       });
       updateCount();
       v.appendChild(cp);
@@ -936,8 +956,8 @@
   }
   function renderHist(){
     const v=$('#view-hist'); v.innerHTML='';
-    const atts=allAttempts();
-    if(!atts.length){ v.appendChild(el('div','empty','<div class="big">🗒️</div><div>まだ学習履歴がありません。</div>')); return; }
+    const atts=allAttempts().filter(({q})=>inActiveSection(q));  // 上部トグルの区分に絞る
+    if(!atts.length){ v.appendChild(el('div','empty','<div class="big">🗒️</div><div>この区分（'+secLabel(activeSection)+'）の学習履歴はまだありません。</div>')); return; }
     const seg=el('div','seg');
     [['log','履歴ログ'],['stats','統計']].forEach(([k,lab])=>{
       const b=el('button',null,lab); b.setAttribute('aria-pressed', histMode===k);
@@ -1038,7 +1058,7 @@
     v.appendChild(rp);
 
     v.appendChild(breakdownPanel('分類別の正答率', 'category', atts));
-    v.appendChild(breakdownPanel('年度別の正答率', q=>q.year?q.year+' '+secLabel(q.section):null, atts));
+    v.appendChild(breakdownPanel('年度別の正答率', q=>q.year||null, atts));
   }
   function breakdownPanel(title, key, atts){
     const kf = typeof key==='function' ? key : (q=>q[key]);
@@ -1062,16 +1082,16 @@
   // ---------- MANAGE ----------
   let manageOpenId=null;  // 詳細表示中の問題ID（登録済み一覧）
   let manageQuery='';     // 登録済み一覧の検索キーワード
-  // 設定画面（アカウントアイコンから開くオーバーレイ）。クラウド同期とAI解説の設定を集約。
-  function renderSettings(){
-    const v=$('#settings-body'); v.innerHTML='';
+  // クラウド同期・AI解説の設定パネル群を、渡された要素に追加する（管理画面の先頭に配置）。
+  function appendSettingsPanels(v){
     // Google同期パネル
     const gp=el('div','panel'); gp.appendChild(el('h3',null,'クラウド同期','<small>端末間で履歴を同期</small>'));
-    const grow=el('div'); grow.style.cssText='display:flex;gap:10px;flex-wrap:wrap';
+    const grow=el('div'); grow.style.cssText='display:flex;gap:10px;flex-wrap:wrap;align-items:center';
+    const gicon=el('span','gicon','G'); grow.appendChild(gicon);
     const onBtn=el('button','btn sm'); onBtn.textContent='Googleでログインして同期ON';
     onBtn.addEventListener('click',enableSync);
     const offBtn=el('button','btn sec sm'); offBtn.textContent='同期OFF';
-    offBtn.addEventListener('click',async()=>{ await disableSync(); renderSettings(); updateProfileIcon(); });
+    offBtn.addEventListener('click',async()=>{ await disableSync(); renderManage(); updateProfileIcon(); });
     grow.appendChild(onBtn); grow.appendChild(offBtn); gp.appendChild(grow);
     const ghelp=el('div','mini'); ghelp.style.marginTop='8px';
     ghelp.textContent= syncEnabled ? '同期中。解答するたび自動で保存されます。' : 'ログインすると他の端末と学習履歴を共有できます。';
@@ -1098,16 +1118,16 @@
     ap.appendChild(ahelp); ap.appendChild(amsg);
     v.appendChild(ap);
   }
-  let settingsOpen=false;
-  function openSettings(){ renderSettings(); $('#settings-overlay').hidden=false; settingsOpen=true; window.scrollTo(0,0); }
-  function closeSettings(){ $('#settings-overlay').hidden=true; settingsOpen=false; }
 
   function renderManage(){
     const v=$('#view-manage'); v.innerHTML='';
+    // ハンバーガーから開く管理画面。クラウド同期・AI設定をここに集約。
+    appendSettingsPanels(v);
 
-    // current data summary + export/reset + browse
-    const sp=el('div','panel'); sp.appendChild(el('h3',null,'登録済みの問題','<small>'+questions.length+' 問</small>'));
-    const byYear={}; questions.forEach(q=>{const k=q.year?q.year+' '+secLabel(q.section):'—'; byYear[k]=(byYear[k]||0)+1;});
+    // current data summary + export/reset + browse（現在の区分のみ）
+    const qs=questions.filter(inActiveSection);
+    const sp=el('div','panel'); sp.appendChild(el('h3',null,'登録済みの問題','<small>'+secLabel(activeSection)+'　'+qs.length+' 問</small>'));
+    const byYear={}; qs.forEach(q=>{const k=q.year||'—'; byYear[k]=(byYear[k]||0)+1;});
     Object.keys(byYear).sort().forEach(y=>{
       const row=el('div','secrow'); row.appendChild(el('div','secname',y));
       row.appendChild(el('div',null,'')); row.lastChild.style.flex='1';
@@ -1140,7 +1160,7 @@
     function draw(){
       list.innerHTML='';
       const kw=manageQuery.trim().toLowerCase();
-      const filtered=questions.filter(q=> !kw || ((q.category||'')+(q.year||'')+(q.exam||'')+(q.question||'')).toLowerCase().includes(kw));
+      const filtered=questions.filter(inActiveSection).filter(q=> !kw || ((q.category||'')+(q.year||'')+(q.exam||'')+(q.question||'')).toLowerCase().includes(kw));
       if(!filtered.length){ list.appendChild(el('div','mini','該当する問題がありません。')); return; }
       filtered.forEach(q=>{
         const p=progress[q.id]; const atts=p?p.attempts:[]; const last=atts.length?atts[atts.length-1]:null;
@@ -1383,7 +1403,7 @@
     syncStatus=s||'off';
     const d=$('#syncDot');
     if(d) d.className='sync-dot'+(syncStatus==='ok'?' ok':((syncStatus==='reauth'||syncStatus==='error')?' warn':''));
-    if(settingsOpen) renderSettings(); // 設定画面が開いていれば説明文言も更新
+    if(currentView==='manage') renderManage(); // 管理画面表示中なら同期の説明文言も更新
   }
   // 右上アイコン: ログイン中はGoogleのプロフィール画像、未ログインはフォールバック(👤)
   function updateProfileIcon(){
@@ -1422,7 +1442,7 @@
       try{ localStorage.setItem('kakomon:syncEnabled','1'); }catch(e){}
       updateProfileIcon();
       await pullMergePush();
-      if(settingsOpen) renderSettings();
+      if(currentView==='manage') renderManage();
     }catch(e){ console.error(e); setSyncStatus('error'); alert('Googleログインに失敗しました。'); }
   }
   async function disableSync(){
@@ -1679,9 +1699,11 @@
 
   // ---------- boot ----------
   (async function init(){
-    $('#profileBtn').addEventListener('click', openSettings);
-    $('#settingsClose').addEventListener('click', closeSettings);
     updateProfileIcon();
+    activeSection = await jget('kakomon:activeSection', '午前1');
+    if(activeSection!=='午前1' && activeSection!=='午前2') activeSection='午前1';
+    root.querySelectorAll('.sec-btn').forEach(b=>b.setAttribute('aria-selected', b.dataset.sec===activeSection));
+    moveSecGlider();
     questions = await jget('kakomon:questions', []);
     progress = await jget('kakomon:progress', {});
     // 旧スキーマ(固定間隔)からの移行: 履歴から ivl/ef/due 等を再計算
