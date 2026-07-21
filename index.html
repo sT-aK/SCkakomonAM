@@ -50,6 +50,8 @@
     --glass-bg:rgba(255,255,255,.16); --glass-line:rgba(255,255,255,.5);
     --glass-edge:inset 0 1px 0 rgba(255,255,255,.55), inset 0 -1px 0 rgba(255,255,255,.12);
     --glass-shadow:0 12px 36px rgba(10,50,90,.22);
+    /* 上部バー用「水滴」トークン（高透過・強い鏡面） */
+    --drop-bg:rgba(255,255,255,.06); --drop-line:rgba(255,255,255,.62); --drop-hi:rgba(255,255,255,.85);
   }
   /* 夜テーマ「ナイトグラス」（18〜5時） */
   #app-root.night{
@@ -71,6 +73,7 @@
     --glass-bg:rgba(30,26,60,.34); --glass-line:rgba(255,255,255,.22);
     --glass-edge:inset 0 1px 0 rgba(255,255,255,.28), inset 0 -1px 0 rgba(255,255,255,.06);
     --glass-shadow:0 12px 36px rgba(0,0,0,.5);
+    --drop-bg:rgba(255,255,255,.04); --drop-line:rgba(255,255,255,.3); --drop-hi:rgba(255,255,255,.6);
   }
   #app-root{font-family:var(--jp); color:var(--ink); -webkit-font-smoothing:antialiased; line-height:1.6; min-height:100vh; --bg-x:0; --bg-y:0; --bg-hue:0deg;}
   /* 全画面固定のグラデ層。JS(下部の自己再帰ループ)がランダムな目標値を
@@ -93,6 +96,32 @@
   .sec-seg{position:relative; flex:1; display:flex; gap:6px; padding:5px; border:1px solid var(--glass-line); border-radius:var(--radius-cap); background:var(--glass-bg); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur); box-shadow:var(--glass-edge), var(--glass-shadow);}
   #secGlider{position:absolute; top:5px; bottom:5px; left:0; width:0; border-radius:var(--radius-cap); background:var(--tab-on-bg); box-shadow:var(--shadow); z-index:0; pointer-events:none; transition:transform var(--dur-med) var(--ease-liquid), width var(--dur-med) var(--ease-liquid);}
   .sec-btn{position:relative; z-index:1; flex:1; text-align:center; padding:9px 4px; border-radius:var(--radius-cap); font-size:14px; font-weight:700; letter-spacing:.03em; color:var(--muted); cursor:pointer; border:none; background:transparent; font-family:inherit; transition:color var(--dur-fast) var(--ease-liquid);}
+  /* 上部バーを水滴風に：高透過フィル＋屈折シーン＋強い鏡面ハイライト＋ぷっくりした陰影 */
+  .topbar-float .menu-btn:not(.on), .topbar-float .sec-seg{
+    background:
+      radial-gradient(135% 105% at 26% 4%, var(--drop-hi), rgba(255,255,255,.10) 40%, rgba(255,255,255,0) 70%),
+      var(--drop-bg);
+    -webkit-backdrop-filter:blur(9px) saturate(200%) brightness(1.12);
+    backdrop-filter:blur(9px) saturate(200%) brightness(1.12);
+    border:1px solid var(--drop-line);
+    box-shadow:
+      inset 0 2px .5px rgba(255,255,255,.95),
+      inset 0 -9px 16px -8px var(--drop-hi),
+      inset 0 0 14px rgba(255,255,255,.10),
+      0 12px 26px -6px rgba(10,40,80,.20),
+      0 3px 8px rgba(10,40,80,.12);
+  }
+  /* 水滴表面の光の帯（上部の鏡面ストリーク）。文字より奥に敷いて可読性を保つ */
+  .topbar-float .menu-btn:not(.on)::before, .topbar-float .sec-seg::before{
+    content:''; position:absolute; left:9%; right:9%; top:2.5px; height:34%; z-index:0;
+    border-radius:999px; pointer-events:none;
+    background:linear-gradient(180deg, var(--drop-hi), rgba(255,255,255,0));
+    opacity:.75; filter:blur(.4px);
+  }
+  #app-root.night .topbar-float .menu-btn:not(.on), #app-root.night .topbar-float .sec-seg{
+    -webkit-backdrop-filter:blur(11px) saturate(180%) brightness(1.06);
+    backdrop-filter:blur(11px) saturate(180%) brightness(1.06);
+  }
   .sec-btn[aria-selected="true"]{color:var(--tab-on-ink);}
   .persist-note{font-size:11.5px; color:var(--muted); background:var(--card2); border:1px solid var(--line); padding:4px 9px; border-radius:999px;}
   .persist-note.warn{color:var(--due); border-color:var(--due-soft); background:var(--due-soft);}
