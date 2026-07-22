@@ -1,4 +1,4 @@
-const CACHE = 'kakomon-v38';
+const CACHE = 'kakomon-v39';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest',
   './data/index.json',
