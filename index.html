@@ -22,7 +22,7 @@
     /* リキッドグラス: 粘性のあるモーション用イージング */
     --ease-liquid:cubic-bezier(.22,1,.36,1); --ease-liquid-inout:cubic-bezier(.65,0,.35,1); --ease-press:cubic-bezier(.34,1.25,.64,1);
     --dur-fast:.3s; --dur-med:.55s; --dur-slow:.8s;
-    --glass-blur:blur(22px) saturate(180%);
+    --glass-blur:blur(14px) saturate(155%);
   }
   /* 標準のドキュメントスクロール構成（bodyがスクロール）。
      背景グラデは #app-root::before の全画面固定レイヤーで描き、穏やかにアニメさせる。
@@ -42,12 +42,12 @@
     --new:#2b6cb0; --new-soft:rgba(43,108,176,.15);
     --unk:#6d5ce0; --unk-soft:rgba(109,92,224,.15);
     --btn-bg:#ffffff; --btn-ink:#1d6fb8;
-    --tab-on-bg:#1d6fb8; --tab-on-ink:#fff;
+    --tab-on-bg:#1d6fb8; --tab-on-ink:#fff; --tab-on-glass:rgba(29,111,184,.42);
     --track:rgba(255,255,255,.55);
     --hero:rgba(255,255,255,.28); --hero-line:rgba(255,255,255,.5);
     --on-grad:rgba(255,255,255,.92);
     --shadow:0 8px 24px rgba(10,50,90,.16);
-    --glass-bg:rgba(255,255,255,.08); --glass-line:rgba(255,255,255,.5);
+    --glass-bg:rgba(255,255,255,.05); --glass-line:rgba(255,255,255,.5);
     --glass-edge:inset 0 1px 0 rgba(255,255,255,.55), inset 0 -1px 0 rgba(255,255,255,.12);
     --glass-shadow:0 12px 36px rgba(10,50,90,.22);
   }
@@ -63,12 +63,12 @@
     --new:#4a8ce0; --new-soft:rgba(74,140,224,.18);
     --unk:#a78bfa; --unk-soft:rgba(167,139,250,.18);
     --btn-bg:linear-gradient(135deg,#8be9fd,#a78bfa); --btn-ink:#141233;
-    --tab-on-bg:#6d5ce0; --tab-on-ink:#fff;
+    --tab-on-bg:#6d5ce0; --tab-on-ink:#fff; --tab-on-glass:rgba(109,92,224,.42);
     --track:rgba(255,255,255,.14);
     --hero:rgba(255,255,255,.12); --hero-line:rgba(255,255,255,.22);
     --on-grad:rgba(236,234,251,.8);
     --shadow:0 8px 24px rgba(0,0,0,.35);
-    --glass-bg:rgba(30,26,60,.18); --glass-line:rgba(255,255,255,.22);
+    --glass-bg:rgba(30,26,60,.12); --glass-line:rgba(255,255,255,.22);
     --glass-edge:inset 0 1px 0 rgba(255,255,255,.28), inset 0 -1px 0 rgba(255,255,255,.06);
     --glass-shadow:0 12px 36px rgba(0,0,0,.5);
   }
@@ -88,17 +88,15 @@
   .topbar-float{position:fixed; top:calc(env(safe-area-inset-top,0px) + 10px); left:50%; transform:translateX(-50%); z-index:60; display:flex; align-items:center; gap:10px; width:min(92vw,560px); padding-left:max(0px,calc(env(safe-area-inset-left) - 4vw)); padding-right:max(0px,calc(env(safe-area-inset-right) - 4vw));}
   .menu-btn{position:relative; flex:none; width:46px; height:46px; padding:0; border:1px solid var(--glass-line); border-radius:var(--radius-cap); background:var(--glass-bg); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur); box-shadow:var(--glass-edge), var(--glass-shadow); color:var(--ink); font-size:18px; line-height:1; cursor:pointer; -webkit-appearance:none; appearance:none; display:flex; align-items:center; justify-content:center; overflow:visible; transition:transform var(--dur-fast) var(--ease-press), background .35s var(--ease-liquid), color .35s var(--ease-liquid), border-color .35s var(--ease-liquid);}
   .menu-btn:active{transform:scale(.92);}
-  .menu-btn.on{background:var(--tab-on-bg); color:var(--tab-on-ink); border-color:var(--tab-on-bg);}
+  .menu-btn.on{background:var(--tab-on-glass); color:var(--tab-on-ink); border-color:var(--glass-line);}
   .menu-ic{font-size:18px; font-weight:700;}
   /* AMⅠ/AMⅡトグルは横幅を狭め、バー内で中央寄せ（ハンバーガーは左に固定） */
   .sec-seg{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:min(60vw,240px); display:flex; gap:6px; padding:5px; border:1px solid var(--glass-line); border-radius:var(--radius-cap); background:var(--glass-bg); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur); box-shadow:var(--glass-edge), var(--glass-shadow);}
-  #secGlider{position:absolute; top:5px; bottom:5px; left:0; width:0; border-radius:var(--radius-cap); background:var(--tab-on-bg); box-shadow:var(--shadow); z-index:0; pointer-events:none; transition:transform var(--dur-med) var(--ease-liquid), width var(--dur-med) var(--ease-liquid);}
+  #secGlider{position:absolute; top:5px; bottom:5px; left:0; width:0; border-radius:var(--radius-cap); background:var(--tab-on-glass); z-index:0; pointer-events:none; transition:transform var(--dur-med) var(--ease-liquid), width var(--dur-med) var(--ease-liquid);}
   .sec-btn{position:relative; z-index:1; flex:1; text-align:center; padding:9px 4px; border-radius:var(--radius-cap); font-size:14px; font-weight:700; letter-spacing:.03em; color:var(--muted); cursor:pointer; border:none; background:transparent; font-family:inherit; transition:color var(--dur-fast) var(--ease-liquid);}
   .sec-btn[aria-selected="true"]{color:var(--tab-on-ink);}
   .persist-note{font-size:11.5px; color:var(--muted); background:var(--card2); border:1px solid var(--line); padding:4px 9px; border-radius:999px;}
   .persist-note.warn{color:var(--due); border-color:var(--due-soft); background:var(--due-soft);}
-  .sync-dot{position:absolute; right:-2px; bottom:-2px; width:12px; height:12px; border-radius:50%; background:var(--muted); border:2px solid var(--glass-bg); box-shadow:0 0 0 1px var(--glass-line);}
-  .sync-dot.ok{background:var(--ok);} .sync-dot.warn{background:var(--due);}
   .gicon{flex:none; width:30px; height:30px; border-radius:50%; background:#fff; color:#4285F4; border:1px solid var(--glass-line); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:16px; box-shadow:var(--glass-edge);}
   /* 区分切替時のカード風スライド（左右）。再描画後に付与し animationend で外す */
   @keyframes cardInR{from{opacity:0; transform:translateX(30px) scale(.985);} to{opacity:1; transform:none;}}
@@ -108,7 +106,7 @@
   /* タブバーは画面下端から浮いたガラスのカプセル。選択中タブは#tabGliderが
      液体的にスライドして追従する（moveGlider()）。手動オフセット/モード分岐なし。 */
   .tabs{position:fixed; left:50%; bottom:calc(12px + env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:50; width:min(92vw,560px); display:flex; gap:6px; background:var(--glass-bg); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur); border:1px solid var(--glass-line); border-radius:var(--radius-cap); padding:5px; box-shadow:var(--glass-edge), var(--glass-shadow);}
-  #tabGlider{position:absolute; top:5px; bottom:5px; left:0; width:0; border-radius:var(--radius-cap); background:var(--tab-on-bg); box-shadow:var(--shadow); z-index:0; pointer-events:none; transition:transform var(--dur-med) var(--ease-liquid), width var(--dur-med) var(--ease-liquid);}
+  #tabGlider{position:absolute; top:5px; bottom:5px; left:0; width:0; border-radius:var(--radius-cap); background:var(--tab-on-glass); z-index:0; pointer-events:none; transition:transform var(--dur-med) var(--ease-liquid), width var(--dur-med) var(--ease-liquid);}
   .tab{position:relative; z-index:1; flex:1; text-align:center; padding:11px 4px; border-radius:var(--radius-cap); font-size:13.5px; font-weight:600; color:var(--muted); cursor:pointer; border:none; background:transparent; font-family:inherit; transition:color var(--dur-fast) var(--ease-liquid);}
   .tab[aria-selected="true"]{color:var(--tab-on-ink);}
   .view{display:none;} .view.active{display:block;}
@@ -316,7 +314,6 @@
 <div class="topbar-float" role="group" aria-label="区分と管理">
   <button id="menuBtn" class="menu-btn" type="button" aria-label="管理画面を開く">
     <span class="menu-ic" aria-hidden="true">☰</span>
-    <span id="syncDot" class="sync-dot"></span>
   </button>
   <div class="sec-seg" role="tablist" aria-label="午前区分">
     <div id="secGlider"></div>
