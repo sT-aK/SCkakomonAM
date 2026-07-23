@@ -83,9 +83,9 @@
   .stat,.panel,.qcard,.scorecard,.daylist{-webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur);}
   #app-root *{box-sizing:border-box;}
   /* padding-top = 浮遊トップバー、padding-bottom = 浮遊タブバー。どちらにも隠れないように */
-  .wrap{max-width:760px; margin:0 auto; padding:calc(env(safe-area-inset-top,0px) + 74px) 16px calc(88px + env(safe-area-inset-bottom));}
+  .wrap{max-width:820px; margin:0 auto; padding:calc(env(safe-area-inset-top,0px) + 74px) 10px calc(88px + env(safe-area-inset-bottom));}
   /* ---- 上部：浮遊ガラスバー（ハンバーガー＋AMⅠ/AMⅡ区分トグル） ---- */
-  .topbar-float{position:fixed; top:calc(env(safe-area-inset-top,0px) + 10px); left:50%; transform:translateX(-50%); z-index:60; display:flex; align-items:center; gap:10px; width:min(96vw,600px); padding-left:max(0px,calc(env(safe-area-inset-left) - 2vw)); padding-right:max(0px,calc(env(safe-area-inset-right) - 2vw));}
+  .topbar-float{position:fixed; top:calc(env(safe-area-inset-top,0px) + 10px); left:50%; transform:translateX(-50%); z-index:60; display:flex; align-items:center; gap:10px; width:min(92vw,560px); padding-left:max(0px,calc(env(safe-area-inset-left) - 4vw)); padding-right:max(0px,calc(env(safe-area-inset-right) - 4vw));}
   .menu-btn{position:relative; flex:none; width:46px; height:46px; padding:0; border:1px solid var(--glass-line); border-radius:var(--radius-cap); background:var(--glass-bg); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur); box-shadow:var(--glass-edge), var(--glass-shadow); color:var(--ink); font-size:18px; line-height:1; cursor:pointer; -webkit-appearance:none; appearance:none; display:flex; align-items:center; justify-content:center; overflow:visible; transition:transform var(--dur-fast) var(--ease-press), background .35s var(--ease-liquid), color .35s var(--ease-liquid), border-color .35s var(--ease-liquid);}
   .menu-btn:active{transform:scale(.92);}
   .menu-btn.on{background:var(--tab-on-glass); color:var(--tab-on-ink); border-color:var(--glass-line);}
@@ -105,7 +105,7 @@
   .view.sec-in-l{animation:cardInL var(--dur-med) var(--ease-liquid) both;}
   /* タブバーは画面下端から浮いたガラスのカプセル。選択中タブは#tabGliderが
      液体的にスライドして追従する（moveGlider()）。手動オフセット/モード分岐なし。 */
-  .tabs{position:fixed; left:50%; bottom:calc(12px + env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:50; width:min(96vw,600px); display:flex; gap:6px; background:var(--glass-bg); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur); border:1px solid var(--glass-line); border-radius:var(--radius-cap); padding:5px; box-shadow:var(--glass-edge), var(--glass-shadow);}
+  .tabs{position:fixed; left:50%; bottom:calc(12px + env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:50; width:min(92vw,560px); display:flex; gap:6px; background:var(--glass-bg); -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur); border:1px solid var(--glass-line); border-radius:var(--radius-cap); padding:5px; box-shadow:var(--glass-edge), var(--glass-shadow);}
   #tabGlider{position:absolute; top:5px; bottom:5px; left:0; width:0; border-radius:var(--radius-cap); background:var(--tab-on-glass); z-index:0; pointer-events:none; transition:transform var(--dur-med) var(--ease-liquid), width var(--dur-med) var(--ease-liquid);}
   .tab{position:relative; z-index:1; flex:1; text-align:center; padding:11px 4px; border-radius:var(--radius-cap); font-size:13.5px; font-weight:600; color:var(--muted); cursor:pointer; border:none; background:transparent; font-family:inherit; transition:color var(--dur-fast) var(--ease-liquid);}
   .tab[aria-selected="true"]{color:var(--tab-on-ink);}
@@ -300,7 +300,7 @@
   /* ---- mobile tuning ---- */
   html{ -webkit-text-size-adjust:100%; }
   textarea,input,select{ font-size:16px; }
-  .wrap{ padding-left:max(16px,env(safe-area-inset-left)); padding-right:max(16px,env(safe-area-inset-right)); }
+  .wrap{ padding-left:max(10px,env(safe-area-inset-left)); padding-right:max(10px,env(safe-area-inset-right)); }
   button{ -webkit-tap-highlight-color:transparent; }
   .tab{ min-height:40px; }
   .choice{ min-height:48px; }
