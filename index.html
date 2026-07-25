@@ -50,7 +50,7 @@
     --glass-bg:rgba(255,255,255,.05); --glass-line:rgba(255,255,255,.5);
     --glass-edge:inset 0 1px 0 rgba(255,255,255,.55), inset 0 -1px 0 rgba(255,255,255,.12);
     --glass-shadow:0 12px 36px rgba(10,50,90,.22);
-    --drawer-bg:rgba(238,246,255,.62);
+    --drawer-bg:rgba(238,246,255,.8);
   }
   /* 夜テーマ「ナイトグラス」（18〜5時） */
   #app-root.night{
@@ -72,7 +72,7 @@
     --glass-bg:rgba(30,26,60,.12); --glass-line:rgba(255,255,255,.22);
     --glass-edge:inset 0 1px 0 rgba(255,255,255,.28), inset 0 -1px 0 rgba(255,255,255,.06);
     --glass-shadow:0 12px 36px rgba(0,0,0,.5);
-    --drawer-bg:rgba(20,18,45,.66);
+    --drawer-bg:rgba(20,18,45,.82);
   }
   #app-root{font-family:var(--jp); color:var(--ink); -webkit-font-smoothing:antialiased; line-height:1.6; min-height:100vh; --bg-x:0; --bg-y:0; --bg-hue:0deg;}
   /* 全画面固定のグラデ層。JS(下部の自己再帰ループ)がランダムな目標値を
@@ -112,14 +112,16 @@
   .tab{position:relative; z-index:1; flex:1; text-align:center; padding:11px 4px; border-radius:var(--radius-cap); font-size:13.5px; font-weight:600; color:var(--muted); cursor:pointer; border:none; background:transparent; font-family:inherit; transition:color var(--dur-fast) var(--ease-liquid);}
   .tab[aria-selected="true"]{color:var(--tab-on-ink);}
   /* ---- ドロワーメニュー（ハンバーガーで左からスライドイン。上下バーは表示のまま） ---- */
-  #drawer-scrim{position:fixed; inset:0; z-index:44; background:rgba(10,20,40,.28); opacity:0; transition:opacity var(--dur-med) var(--ease-liquid); -webkit-tap-highlight-color:transparent;}
-  #drawer-scrim.open{opacity:1;}
-  #drawer-scrim[hidden]{display:none;}
-  .drawer{position:fixed; left:0; top:0; bottom:0; z-index:45; width:min(88vw,420px); background:var(--drawer-bg); -webkit-backdrop-filter:blur(24px) saturate(160%); backdrop-filter:blur(24px) saturate(160%); border-right:1px solid var(--glass-line); box-shadow:8px 0 34px rgba(10,30,60,.28); overflow-y:auto; -webkit-overflow-scrolling:touch; transform:translateX(-101%); transition:transform var(--dur-med) var(--ease-liquid);}
+  /* フルスクリーンのドロワー。タブ(z50)や上部バー(z60)より前面(z70)に出す。
+     開いている間は上下バーを隠す（下の #app-root.drawer-open ルール）。閉じるボタンだけ z75 で最前面 */
+  .drawer{position:fixed; inset:0; z-index:70; background:var(--drawer-bg); -webkit-backdrop-filter:blur(24px) saturate(160%); backdrop-filter:blur(24px) saturate(160%); overflow-y:auto; -webkit-overflow-scrolling:touch; transform:translateX(-101%); transition:transform var(--dur-med) var(--ease-liquid);}
   .drawer.open{transform:none;}
+  #app-root.drawer-open .sec-seg, #app-root.drawer-open .tabs{opacity:0; pointer-events:none; transition:opacity var(--dur-fast) var(--ease-liquid);}
+  /* 上部バーをドロワーより前面にして、ハンバーガー(✕)だけ操作可能に（トグルはopacity:0で隠す） */
+  #app-root.drawer-open .topbar-float{z-index:75;}
   .drawer[hidden]{display:none;}
   /* 上部バー(74px)・下部タブ(88px)に隠れないよう内側に余白 */
-  #drawer-body{padding:calc(env(safe-area-inset-top,0px) + 74px) 14px calc(env(safe-area-inset-bottom,0px) + 96px) max(14px,env(safe-area-inset-left));}
+  #drawer-body{max-width:760px; margin:0 auto; padding:calc(env(safe-area-inset-top,0px) + 74px) max(16px,env(safe-area-inset-right)) calc(env(safe-area-inset-bottom,0px) + 28px) max(16px,env(safe-area-inset-left));}
   .view{display:none;} .view.active{display:block;}
   /* 画面切替のスライド静定（display:none→block で毎回再生される）。粘性系でゆっくりぬるっと。
      opacityはアニメしない: フェード中に背景グラデが露出して「背景色が切り替わる」ように見えるうえ、
@@ -344,7 +346,6 @@
   <button class="tab" role="tab" data-view="study" aria-selected="false">学習</button>
   <button class="tab" role="tab" data-view="hist" aria-selected="false">履歴</button>
 </div>
-<div id="drawer-scrim" hidden></div>
 <aside id="drawer" class="drawer" hidden aria-label="メニュー">
   <div id="drawer-body"></div>
 </aside>
@@ -576,28 +577,33 @@
   root.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{ closeDrawer(); show(t.dataset.view); }));
 
   // ---------- ドロワーメニュー（ハンバーガー） ----------
-  // 中身は renderManage（上から クラウド同期 → AI解説 → 登録済みの問題）。上下バーは表示のまま。
+  // フルスクリーンで前面に表示（上下バーは隠す）。中身は renderManage
+  // （上から クラウド同期 → AI解説 → 登録済みの問題）。ハンバーガーは開いている間 ✕ に。
   let drawerOpen=false;
+  function setMenuIcon(x){ const i=$('#menuBtn .menu-ic'); if(i) i.textContent = x ? '✕' : '☰'; }
   function openDrawer(){
     renderManage();
-    $('#drawer').hidden=false; $('#drawer-scrim').hidden=false;
-    requestAnimationFrame(()=>{ $('#drawer').classList.add('open'); $('#drawer-scrim').classList.add('open'); });
+    $('#drawer').hidden=false;
+    requestAnimationFrame(()=>{ $('#drawer').classList.add('open'); });
     drawerOpen=true;
-    const mb=$('#menuBtn'); if(mb){ mb.classList.add('on'); mb.setAttribute('aria-expanded','true'); }
+    root.classList.add('drawer-open');
+    const mb=$('#menuBtn'); if(mb){ mb.classList.add('on'); mb.setAttribute('aria-expanded','true'); mb.setAttribute('aria-label','メニューを閉じる'); }
+    setMenuIcon(true);
   }
   function closeDrawer(){
     if(!drawerOpen) return;
     drawerOpen=false;
-    const d=$('#drawer'), s=$('#drawer-scrim');
-    d.classList.remove('open'); s.classList.remove('open');
-    const done=()=>{ if(!drawerOpen){ d.hidden=true; s.hidden=true; } };
+    root.classList.remove('drawer-open');
+    const d=$('#drawer');
+    d.classList.remove('open');
+    const done=()=>{ if(!drawerOpen) d.hidden=true; };
     d.addEventListener('transitionend', done, {once:true});
     setTimeout(done, 420); // transitionendが来ない場合のフォールバック
-    const mb=$('#menuBtn'); if(mb){ mb.classList.remove('on'); mb.setAttribute('aria-expanded','false'); }
+    const mb=$('#menuBtn'); if(mb){ mb.classList.remove('on'); mb.setAttribute('aria-expanded','false'); mb.setAttribute('aria-label','メニューを開く'); }
+    setMenuIcon(false);
   }
   function toggleDrawer(){ drawerOpen ? closeDrawer() : openDrawer(); }
   $('#menuBtn').addEventListener('click', toggleDrawer);
-  $('#drawer-scrim').addEventListener('click', closeDrawer);
   document.addEventListener('keydown', e=>{ if(e.key==='Escape' && drawerOpen) closeDrawer(); });
 
   // AMⅠ/AMⅡ の切替。ホーム／履歴／問題管理を対象に絞る（学習は対象外）。dir>0で左方向へ入るカード演出。
