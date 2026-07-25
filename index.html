@@ -583,8 +583,10 @@
   function setMenuIcon(x){ const i=$('#menuBtn .menu-ic'); if(i) i.textContent = x ? '✕' : '☰'; }
   function openDrawer(){
     renderManage();
-    $('#drawer').hidden=false;
-    requestAnimationFrame(()=>{ $('#drawer').classList.add('open'); });
+    const d=$('#drawer');
+    d.style.transition=''; d.style.transform='';   // 前回のスワイプ残りを解除して開く
+    d.hidden=false;
+    requestAnimationFrame(()=>{ d.classList.add('open'); });
     drawerOpen=true;
     root.classList.add('drawer-open');
     const mb=$('#menuBtn'); if(mb){ mb.classList.add('on'); mb.setAttribute('aria-expanded','true'); mb.setAttribute('aria-label','メニューを閉じる'); }
@@ -653,6 +655,7 @@
     }, {passive:true});
     root.addEventListener('touchend', e=>{
       if(locked||e.changedTouches.length!==1) return;
+      if(drawerOpen) return;           // ドロワー表示中は区分スワイプ無効（閉じるスワイプを優先）
       if(currentView==='study') return; // 学習中は区分スワイプ無効
       const dx=e.changedTouches[0].clientX-sx, dy=e.changedTouches[0].clientY-sy;
       if(Math.abs(dx)<MIN_X || Math.abs(dy)>Math.abs(dx)*MAX_Y_RATIO) return;
@@ -660,6 +663,48 @@
       const next = dx<0 ? Math.min(cur+1,SECS.length-1) : Math.max(cur-1,0);
       if(next!==cur) switchSection(SECS[next], dx<0?1:-1);
     }, {passive:true});
+  })();
+
+  // ---------- ドロワー: 左スワイプで閉じる（指に追従→閾値超え or 勢いで閉じる） ----------
+  (function(){
+    const d=$('#drawer'); if(!d) return;
+    let sx=0, sy=0, st=0, active=false, decided=false, horiz=false;
+    d.addEventListener('touchstart', e=>{
+      if(!drawerOpen || e.touches.length!==1){ active=false; return; }
+      sx=e.touches[0].clientX; sy=e.touches[0].clientY; st=Date.now();
+      active=true; decided=false; horiz=false;
+    }, {passive:true});
+    d.addEventListener('touchmove', e=>{
+      if(!active) return;
+      const dx=e.touches[0].clientX-sx, dy=e.touches[0].clientY-sy;
+      if(!decided){
+        if(Math.abs(dx)<8 && Math.abs(dy)<8) return;
+        decided=true;
+        horiz = (dx<0) && Math.abs(dx) > Math.abs(dy)*1.3; // 左方向の水平ドラッグのみ捕捉（縦スクロールは通す）
+        if(horiz){ d.style.transition='none'; }
+        else { active=false; return; }
+      }
+      if(horiz){
+        e.preventDefault();                 // 横ドラッグ確定時は縦スクロールを抑止
+        d.style.transform='translateX('+Math.min(0,dx)+'px)';
+      }
+    }, {passive:false});
+    function end(e){
+      if(!active) return;
+      active=false;
+      d.style.transition='';                // アニメーションを復帰
+      if(!horiz) return;
+      const dx=e.changedTouches[0].clientX-sx, dt=Date.now()-st;
+      const flick = dx<-40 && dt<300;       // 素早い左フリック
+      if(dx < -80 || flick){
+        d.style.transform='translateX(-101%)'; // ドラッグ位置からそのまま閉じ方向へ（バウンド防止）
+        closeDrawer();
+      } else {
+        d.style.transform='';               // スナップバック（.open=0へ）
+      }
+    }
+    d.addEventListener('touchend', end, {passive:true});
+    d.addEventListener('touchcancel', end, {passive:true});
   })();
 
   // documentスクロール構成に戻したため、バウンス抑止のtouchmoveガードは撤去。
