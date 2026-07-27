@@ -580,13 +580,20 @@
   // フルスクリーンで前面に表示（上下バーは隠す）。中身は renderManage
   // （上から クラウド同期 → AI解説 → 登録済みの問題）。ハンバーガーは開いている間 ✕ に。
   let drawerOpen=false;
+  let edgeDragging=false;   // 左エッジからのドラッグ中（区分スワイプを抑止するため）
   function setMenuIcon(x){ const i=$('#menuBtn .menu-ic'); if(i) i.textContent = x ? '✕' : '☰'; }
-  function openDrawer(){
-    renderManage();
+  // fromDrag=true: エッジスワイプの指の位置（インラインtransform）からそのまま繋いで開く
+  function openDrawer(fromDrag){
     const d=$('#drawer');
-    d.style.transition=''; d.style.transform='';   // 前回のスワイプ残りを解除して開く
-    d.hidden=false;
-    requestAnimationFrame(()=>{ d.classList.add('open'); });
+    if(fromDrag){
+      d.classList.add('open');                     // 目標位置(0)を確定させたうえで
+      requestAnimationFrame(()=>{ d.style.transition=''; d.style.transform=''; }); // ドラッグ位置から0へアニメ
+    } else {
+      renderManage();
+      d.style.transition=''; d.style.transform=''; // 前回のスワイプ残りを解除して開く
+      d.hidden=false;
+      requestAnimationFrame(()=>{ d.classList.add('open'); });
+    }
     drawerOpen=true;
     root.classList.add('drawer-open');
     const mb=$('#menuBtn'); if(mb){ mb.classList.add('on'); mb.setAttribute('aria-expanded','true'); mb.setAttribute('aria-label','メニューを閉じる'); }
@@ -655,8 +662,8 @@
     }, {passive:true});
     root.addEventListener('touchend', e=>{
       if(locked||e.changedTouches.length!==1) return;
-      if(drawerOpen) return;           // ドロワー表示中は区分スワイプ無効（閉じるスワイプを優先）
-      if(currentView==='study') return; // 学習中は区分スワイプ無効
+      if(drawerOpen||edgeDragging) return; // ドロワー表示中／エッジからの開くスワイプ中は区分スワイプ無効
+      if(currentView==='study') return;    // 学習中は区分スワイプ無効
       const dx=e.changedTouches[0].clientX-sx, dy=e.changedTouches[0].clientY-sy;
       if(Math.abs(dx)<MIN_X || Math.abs(dy)>Math.abs(dx)*MAX_Y_RATIO) return;
       const cur=SECS.indexOf(activeSection);
@@ -705,6 +712,55 @@
     }
     d.addEventListener('touchend', end, {passive:true});
     d.addEventListener('touchcancel', end, {passive:true});
+  })();
+
+  // ---------- 左エッジからのスワイプでドロワーを開く（ハンバーガー押下と同じ） ----------
+  (function(){
+    const d=$('#drawer'); if(!d) return;
+    const EDGE=24, OPEN_AT=70;   // 左端24px以内から開始／70px超で開く
+    let sx=0, sy=0, st=0, W=1, active=false, decided=false, dragging=false;
+    root.addEventListener('touchstart', e=>{
+      if(drawerOpen || e.touches.length!==1){ active=false; return; }
+      const t=e.touches[0];
+      if(t.clientX>EDGE){ active=false; return; }   // 左エッジ発進のみ
+      sx=t.clientX; sy=t.clientY; st=Date.now(); W=window.innerWidth||1;
+      active=true; decided=false; dragging=false;
+    }, {passive:true});
+    root.addEventListener('touchmove', e=>{
+      if(!active) return;
+      const dx=e.touches[0].clientX-sx, dy=e.touches[0].clientY-sy;
+      if(!decided){
+        if(Math.abs(dx)<8 && Math.abs(dy)<8) return;
+        decided=true;
+        dragging = dx>0 && Math.abs(dx)>Math.abs(dy)*1.3;  // 右方向の水平ドラッグのみ捕捉
+        if(!dragging){ active=false; return; }
+        edgeDragging=true;
+        renderManage();                    // 中身を用意し、引き出しながら見せる
+        d.hidden=false; d.style.transition='none';
+      }
+      if(dragging){
+        e.preventDefault();                // 横ドラッグ確定時は縦スクロールを抑止
+        const p=Math.max(0, Math.min(1, dx/W));
+        d.style.transform='translateX('+(-101+101*p)+'%)';
+      }
+    }, {passive:false});
+    function end(e){
+      if(!active) return;
+      active=false;
+      if(!dragging){ edgeDragging=false; return; }
+      dragging=false;
+      const dx=e.changedTouches[0].clientX-sx, dt=Date.now()-st;
+      const flick = dx>40 && dt<300;       // 素早い右フリック
+      if(dx>OPEN_AT || flick){
+        openDrawer(true);                  // ドラッグ位置から繋いで開く
+      } else {                             // 閾値未満は閉じ位置へ戻す
+        d.style.transition=''; d.style.transform='';
+        setTimeout(()=>{ if(!drawerOpen) d.hidden=true; }, 420);
+      }
+      setTimeout(()=>{ edgeDragging=false; }, 0);  // 区分スワイプ側の判定後に解除
+    }
+    root.addEventListener('touchend', end, {passive:true});
+    root.addEventListener('touchcancel', end, {passive:true});
   })();
 
   // documentスクロール構成に戻したため、バウンス抑止のtouchmoveガードは撤去。
