@@ -74,7 +74,10 @@
     --glass-shadow:0 12px 36px rgba(0,0,0,.5);
     --drawer-bg:rgba(20,18,45,.82);
   }
-  #app-root{font-family:var(--jp); color:var(--ink); -webkit-font-smoothing:antialiased; line-height:1.6; min-height:100vh; --bg-x:0; --bg-y:0; --bg-hue:0deg;}
+  /* touch-action: 縦スクロールとピンチズームは端末側に任せ、横方向のジェスチャだけJSが受け取る。
+     これが無いとiOSが左エッジのスワイプ等をブラウザ側ジェスチャとして先取りし、
+     ドロワーを開くスワイプ／区分スワイプがJSまで届かない */
+  #app-root{font-family:var(--jp); color:var(--ink); -webkit-font-smoothing:antialiased; line-height:1.6; min-height:100vh; touch-action:pan-y pinch-zoom; --bg-x:0; --bg-y:0; --bg-hue:0deg;}
   /* 全画面固定のグラデ層。JS(下部の自己再帰ループ)がランダムな目標値を
      --bg-x/--bg-y/--bg-hue にセットし、このtransitionで滑らかに遷移する
      ことで周期性のないゆらぎを作る（GPU合成で軽い）。scale(1.15)の
@@ -262,7 +265,7 @@
   .ai-msg li{margin:2px 0;}
   .ai-msg code{background:var(--track); border-radius:5px; padding:1px 5px; font-size:12.5px;}
   /* ミニLaTeX描画（$$..$$/$..$） */
-  .ai-msg .math{display:block; text-align:center; margin:8px 0; font-size:14.5px; overflow-x:auto;}
+  .ai-msg .math{display:block; text-align:center; margin:8px 0; font-size:14.5px; overflow-x:auto; touch-action:auto;} /* 数式は横スクロールを許可 */
   .ai-msg .tex-fr{display:inline-flex; flex-direction:column; text-align:center; vertical-align:middle; margin:0 2px;}
   .ai-msg .tex-fn{border-bottom:1px solid currentColor; padding:0 4px;}
   .ai-msg .tex-fd{padding:0 4px;}
@@ -717,7 +720,9 @@
   // ---------- 左エッジからのスワイプでドロワーを開く（ハンバーガー押下と同じ） ----------
   (function(){
     const d=$('#drawer'); if(!d) return;
-    const EDGE=24, OPEN_AT=70;   // 左端24px以内から開始／70px超で開く
+    // 左端40px以内から開始／56px超で開く。iOSは最端の数pxを自前のジェスチャに使うため
+    // エッジ帯は広めに取り、少し内側から始めても開けるようにする
+    const EDGE=40, OPEN_AT=56;
     let sx=0, sy=0, st=0, W=1, active=false, decided=false, dragging=false;
     root.addEventListener('touchstart', e=>{
       if(drawerOpen || e.touches.length!==1){ active=false; return; }
@@ -730,9 +735,9 @@
       if(!active) return;
       const dx=e.touches[0].clientX-sx, dy=e.touches[0].clientY-sy;
       if(!decided){
-        if(Math.abs(dx)<8 && Math.abs(dy)<8) return;
+        if(Math.abs(dx)<6 && Math.abs(dy)<6) return;
         decided=true;
-        dragging = dx>0 && Math.abs(dx)>Math.abs(dy)*1.3;  // 右方向の水平ドラッグのみ捕捉
+        dragging = dx>0 && Math.abs(dx)>Math.abs(dy);      // 右方向の水平ドラッグのみ捕捉
         if(!dragging){ active=false; return; }
         edgeDragging=true;
         renderManage();                    // 中身を用意し、引き出しながら見せる
@@ -750,7 +755,7 @@
       if(!dragging){ edgeDragging=false; return; }
       dragging=false;
       const dx=e.changedTouches[0].clientX-sx, dt=Date.now()-st;
-      const flick = dx>40 && dt<300;       // 素早い右フリック
+      const flick = dx>28 && dt<300;       // 素早い右フリック
       if(dx>OPEN_AT || flick){
         openDrawer(true);                  // ドラッグ位置から繋いで開く
       } else {                             // 閾値未満は閉じ位置へ戻す
