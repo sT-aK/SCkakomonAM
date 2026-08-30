@@ -1261,7 +1261,9 @@
     });
     ap.appendChild(aseg);
     const ahelp=el('div','mini'); ahelp.style.marginTop='8px';
-    ahelp.innerHTML='キーは <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="color:var(--primary)">Google AI Studio</a> で無料取得できます。キーはこの端末にのみ保存され、同期・バックアップには含まれません。モデルは常に最新版に自動追従します。AIの解説は誤りを含むことがあります。';
+    const cur=(aiModelCache&&aiModelCache.ids&&aiModelCache.ids[aiModel])||'';
+    ahelp.innerHTML='キーは <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="color:var(--primary)">Google AI Studio</a> で無料取得できます。キーはこの端末にのみ保存され、同期・バックアップには含まれません。使用するモデルは、利用可能な一覧から自動で選ばれます（無料枠のFlash系のみ・Proは対象外）。'
+      +(cur?'現在: <code>'+escapeHTML(cur)+'</code>。':'')+'AIの解説は誤りを含むことがあります。';
     ap.appendChild(ahelp); ap.appendChild(amsg);
     v.appendChild(ap);
   }
@@ -1638,10 +1640,55 @@
   // ================= AI解説（Gemini・BYOK） =================
   // キーはユーザー自身が Google AI Studio で取得し、この端末にのみ保存（同期・バックアップ対象外）。
   // 会話キャッシュは kakomon:ai:<qid> にローカル保存し、同期ON時は users/{uid}/ai/{qid} にも保存。
-  // モデルは固定バージョンIDではなく常に最新版を指す公式エイリアスを使う
-  // （固定IDは提供終了で404になるため。例: gemini-2.5-flash は2026年に廃止）
-  const AI_MODELS={'gemini-flash-latest':'Flash（高品質）','gemini-flash-lite-latest':'Flash-Lite（軽量・高速）'};
-  let aiKey='', aiModel='gemini-flash-latest';
+  // モデルIDは固定で持たない。Googleはモデルもエイリアスも頻繁に改廃するため
+  // （gemini-2.5-flash等の固定IDは廃止、gemini-flash-latest等のエイリアスも提供終了で404になる）、
+  // 実行時に ListModels で「そのキーで使えるモデル」を取得し、好み(Flash/Flash-Lite)に合うものを選ぶ。
+  // 保存するのは固定IDではなく好みだけ。無料枠はFlash系のみのためProは候補から除外する。
+  const AI_MODELS={'flash':'Flash（高品質）','flash-lite':'Flash-Lite（軽量・高速）'};
+  let aiKey='', aiModel='flash';
+  // ListModels が失敗した場合の保険（ここも古くなり得るので、あくまで最後の手段）
+  const AI_FALLBACK={'flash':['gemini-3.5-flash','gemini-2.5-flash'],'flash-lite':['gemini-3.5-flash-lite','gemini-2.5-flash-lite']};
+  const AI_EXCLUDE=/embedding|aqa|imagen|veo|tts|audio|live|learnlm|gemma|vision|image/i;
+  let aiModelCache=null;                 // {t, ids:{flash, 'flash-lite'}}
+  const AI_MODEL_TTL=12*3600*1000;       // 12時間キャッシュ
+  function aiModelScore(id){
+    let s=0; const m=id.match(/gemini-(\d+(?:\.\d+)?)/);
+    if(m) s+=parseFloat(m[1])*100;       // 新しい世代ほど優先
+    if(/preview|exp|thinking/i.test(id)) s-=40;  // 安定版を優先
+    if(/latest/i.test(id)) s-=10;                // 浮動エイリアスは避ける
+    return s;
+  }
+  function aiPick(ids, pref){
+    const want = pref==='flash-lite' ? (x=>/flash-lite/i.test(x)) : (x=>/flash/i.test(x)&&!/flash-lite/i.test(x));
+    const c=ids.filter(x=>!/pro/i.test(x)&&!AI_EXCLUDE.test(x)&&want(x)).sort((a,b)=>aiModelScore(b)-aiModelScore(a));
+    return c[0]||null;
+  }
+  async function aiListModels(){
+    const out=[]; let page='';
+    for(let i=0;i<4;i++){
+      const u='https://generativelanguage.googleapis.com/v1beta/models?pageSize=200'+(page?'&pageToken='+encodeURIComponent(page):'');
+      const r=await fetch(u,{headers:{'x-goog-api-key':aiKey}});
+      if(!r.ok) throw new Error('ListModels HTTP '+r.status);
+      const j=await r.json();
+      (j.models||[]).forEach(m=>{
+        const meth=m.supportedGenerationMethods||[];
+        if(meth.indexOf('generateContent')>=0) out.push(String(m.name||'').replace(/^models\//,''));
+      });
+      page=j.nextPageToken||''; if(!page) break;
+    }
+    return out;
+  }
+  // pref('flash'|'flash-lite')に対する実モデルIDを返す。force=true でキャッシュを無視して再検出。
+  async function aiResolveModel(pref, force){
+    const now=Date.now();
+    if(!force && aiModelCache && (now-aiModelCache.t)<AI_MODEL_TTL && aiModelCache.ids[pref]) return aiModelCache.ids[pref];
+    try{
+      const ids=await aiListModels();
+      const got={'flash':aiPick(ids,'flash'), 'flash-lite':aiPick(ids,'flash-lite')};
+      if(got[pref]){ aiModelCache={t:now, ids:got}; jset('kakomon:aiModelCache', aiModelCache); return got[pref]; }
+    }catch(e){ console.warn('ListModels failed', e); }
+    return (AI_FALLBACK[pref]||AI_FALLBACK.flash)[0];
+  }
   const AI_SYS='あなたは情報処理安全確保支援士（SC）試験の熟練講師です。受験者が過去問を深く理解できるよう、日本語で分かりやすく解説してください。\n最初の解説依頼には次の構成で答えてください:\n## 正解と要点\n## 各選択肢の解説（ア〜エそれぞれが正しい/誤りである理由）\n## キーワード解説（問題文や選択肢の重要用語を簡潔に）\n計算・論理式・数式変形・進数変換・確率などを含む問題では、途中式や変形過程を省略せず、番号付きのステップで順を追って解説してください。\n追加質問にはその質問に絞って簡潔に答えてください。装飾は太字・箇条書き・見出し（##）程度にとどめ、表やHTMLは使わないでください。\n数式は $$...$$（独立行）または $...$（行内）のLaTeXで書いてください。使うコマンドは \\frac, \\sqrt, \\times, \\cdot, \\div, \\le, \\ge, \\approx, \\pm, ^, _, \\text 程度にとどめてください。';
   function aiRef(id){ return firebase.firestore().doc('users/'+fbUser.uid+'/ai/'+id); }
   async function aiCacheGet(qid){
@@ -1743,12 +1790,14 @@
     if(!res.ok){
       let detail=''; try{ const eo=JSON.parse(await res.text()); if(eo&&eo.error&&eo.error.message) detail='\n詳細: '+eo.error.message; }catch(e){}
       let msg='AIの呼び出しに失敗しました（HTTP '+res.status+'）。';
-      if(res.status===429) msg='無料枠の上限に達した可能性があります。時間を置くか、問題管理タブでFlash-Liteに切り替えてください。';
-      else if(res.status===404) msg='モデルが見つかりません（提供終了の可能性）。問題管理タブでモデルを切り替えてください。';
-      else if(res.status===503||res.status===500||res.status===504) msg='モデルが混雑しています。時間を置いて再試行するか、問題管理タブでFlash-Liteに切り替えてください。';
-      else if(res.status===400||res.status===401||res.status===403) msg='APIキーが無効の可能性があります。問題管理タブの設定を確認してください。';
+      if(res.status===429) msg='無料枠の上限に達した可能性があります（無料枠は1分/1日あたりの回数に上限があります）。時間を置くか、メニューでFlash-Liteに切り替えてください。';
+      else if(res.status===404) msg='モデルが見つかりません（提供終了の可能性）。利用可能なモデルを取得し直します。';
+      else if(res.status===503||res.status===500||res.status===504) msg='モデルが混雑しています。時間を置いて再試行するか、メニューでFlash-Liteに切り替えてください。';
+      else if(res.status===400||res.status===401||res.status===403) msg='APIキーが無効の可能性があります。メニューの設定を確認してください。';
       const err=new Error(msg+detail);
-      err.retryable=(res.status===503||res.status===500||res.status===504); // 一時的な過負荷のみ再試行対象
+      // 一時的な過負荷に加え、404（モデル改廃）も再試行対象にしてモデル再検出で自動回復させる
+      err.retryable=(res.status===503||res.status===500||res.status===504||res.status===404);
+      err.notFound=(res.status===404);
       throw err;
     }
     const rd=res.body.getReader(); const dec=new TextDecoder(); let buf='', full='';
@@ -1769,16 +1818,24 @@
     if(!full) throw new Error('AIから応答がありませんでした。もう一度お試しください。');
     return full;
   }
-  // 混雑(503等)時は数秒待って再試行し、それでもダメなら軽量なFlash-Liteへ自動フォールバック。
+  // モデルIDは毎回 aiResolveModel で解決する。404（モデル改廃）ならモデル一覧を取り直して自動回復し、
+  // 混雑(503等)なら数秒待って再試行、それでもダメなら軽量なFlash-Liteへフォールバックする。
   // onStatus には再試行中のユーザー向け状況テキストを渡す。
   async function aiCall(contents, onDelta, onStatus){
-    const lite='gemini-flash-lite-latest';
-    const plan=[{m:aiModel,wait:0,note:''},{m:aiModel,wait:2500,note:'混雑のため数秒後に再試行します…'}];
-    if(aiModel!==lite) plan.push({m:lite,wait:2500,note:'混雑が続くためFlash-Liteで再試行します…'});
+    const pref=aiModel, lite='flash-lite';
+    const plan=[
+      {p:pref, force:false, wait:0,    note:''},
+      {p:pref, force:true,  wait:1200, note:'利用可能なモデルを取得し直しています…'},  // 404の自動回復
+      {p:pref, force:false, wait:3000, note:'混雑のため数秒後に再試行します…'}
+    ];
+    if(pref!==lite) plan.push({p:lite, force:false, wait:2500, note:'混雑が続くためFlash-Liteで再試行します…'});
     let lastErr=null;
     for(const st of plan){
       if(st.wait){ if(onStatus) onStatus(st.note); await new Promise(r=>setTimeout(r,st.wait)); }
-      try{ return await aiCallOnce(st.m, contents, onDelta); }
+      let model;
+      try{ model=await aiResolveModel(st.p, st.force); }
+      catch(e){ lastErr=e; continue; }
+      try{ return await aiCallOnce(model, contents, onDelta); }
       catch(e){ lastErr=e; if(!e.retryable) throw e; }
     }
     throw lastErr;
@@ -1857,8 +1914,10 @@
     Object.values(progress).forEach(p=>{ if(p&&p.attempts) Object.assign(p, sched(p.attempts)); });
     difficulty = await jget('kakomon:difficulty', {});
     aiKey = await jget('kakomon:aiKey', '');
-    aiModel = await jget('kakomon:aiModel', 'gemini-flash-latest');
-    if(!AI_MODELS[aiModel]) aiModel='gemini-flash-latest'; // 旧固定ID保存値からの自動移行を含む
+    aiModel = await jget('kakomon:aiModel', 'flash');
+    // 旧保存値（gemini-flash-latest 等の固定ID/エイリアス）から好み('flash'|'flash-lite')へ移行
+    if(!AI_MODELS[aiModel]) aiModel = /lite/i.test(String(aiModel)) ? 'flash-lite' : 'flash';
+    aiModelCache = await jget('kakomon:aiModelCache', null);   // 解決済みモデルIDのキャッシュ
     // ensure shape
     questions.forEach(q=>{ if(q.hasImage===undefined) q.hasImage=false; if(q.calc===undefined) q.calc=isCalcQ(q.id, q); });
 
